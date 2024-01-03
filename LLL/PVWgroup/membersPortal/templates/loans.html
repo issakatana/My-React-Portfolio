@@ -1,0 +1,43 @@
+{% extends 'membersBase.html' %}
+
+{% block content %}
+
+
+
+<section class="accounts-section" id="accountsSection">
+    <article class="myLoans memberPortal-loans" id="myLoansArticle">
+        <h1>My Loans</h1>
+    </article>
+
+    <article class="loanApplication memberPortal-loans" id="loanApplicationArticle">
+        <h1>Loan Application</h1>
+    </article>
+
+    <article class="loanRepayment memberPortal-loans" id="loanRepaymentArticle">
+        <h1>Loan Repayment</h1>
+    </article>
+
+    <article class="guaranteedLoans memberPortal-loans" id="guaranteedLoansArticle">
+        <h1>Guaranteed Loans</h1>
+    </article>
+
+    <article class="guarantorEligibility memberPortal-loans" id="guarantorEligibilityArticle">
+        <h1>Guarantor Eligibility</h1>
+    </article>
+</section>
+
+
+<style>
+    .memberPortal-loans {
+        display: none;
+    }
+    .memberPortal-loans.active {
+        display: block;
+    }
+    .chevLeftDown a.active {
+        background-color: #ddd; 
+    }
+</style>
+
+
+{% endblock %}

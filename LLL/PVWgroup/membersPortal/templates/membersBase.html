@@ -1,0 +1,304 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>PV-Welfare Group</title>
+    <!-- css link  -->
+    <link rel="stylesheet" href="{% static 'styles/memberMain7.css' %}">
+    <!-- high quality Boxicons from boxicons.com -->
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <!-- font awesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- google fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins&display=swap">
+    <!-- html2pdf -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.js"></script>
+    <!-- jquery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Axios Get -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- sweat alerts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Include jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+</head>
+<body class="membersPortal">
+    <section class="mobile-head-layout">
+        <div class="left-mobile">
+            <i class="fa-solid fa-bars" style="color: #662368;"></i>
+        </div>
+        <div class="pvwg-auth-logo" style="margin-left: -20px;">
+            <i class="bx bxl-xing" style="color: #662368;"></i>
+            <div class="pvwg-text-logo">
+                <p>PARKSIDE VILLA</p>
+                <P>WELFARE GROUP</P>
+            </div>
+        </div>
+        <div class="right-mobile">
+            <i class="fa-solid fa-ellipsis-vertical" style="color: #662368;"></i>
+        </div>
+    </section>
+    <header class="membersPortalHeader">
+        <section class="welcome-bar">
+            <div class="user-greet">
+                <p>PVW MEMBER PORTAL</p>
+                <p>{{ page_title }}</p>
+            </div>            
+            <div class="quick-settings">
+                <div class="search">
+                    <i class='bx bx-search-alt-2'></i>
+                <input type="search" id="searchInput" >
+                </div>
+                <i class='bx bx-moon' ></i>
+                <div id="bellIcon" class="bellIcon">
+                    <span id="notificationCount" class="notificationCount">20</span>
+                    <i class='bx bx-bell' ></i>
+                </div>
+                <i class='bx bx-cog' ></i>
+            </div>
+        </section>
+    </header>
+    <style>
+        .aside-intro {
+            background-color: #fff;
+            padding: 1vw;
+            width: 100%;
+        }
+        .aside-bar {
+            padding: 1vw;
+        }
+        .membersPortalAside {
+           padding: 0;
+           margin: 0;
+        }
+        .membersPortalAside >*:nth-child(1) {
+            width: 100%;
+        }
+    </style>
+    
+    <aside class="membersPortalAside">
+        <div class="aside-intro">
+            <div class="pvwg-auth-logo">
+                <i class="bx bxl-xing"></i>
+                <div class="pvwg-text-logo">
+                    <p>PARKSIDE VILLA</p>
+                    <P>WELFARE GROUP</P>
+                </div>
+            </div>
+            <div class="mobile-menu-port">
+                <i class="fa-solid fa-bars"></i>
+            </div>
+        </div>
+
+
+        <section class="aside-bar">
+            <div class="profile-welcome">
+                <figure id="profile-container">
+                    <i id="user-icon" class="bx bxs-user-circle"></i>
+                </figure>
+                <div class="welcome-message-aside">
+                    <p>Welcome, <span class="span1">{{full_name}}</span>,</p>
+                    <p>
+                        {% if current_user.is_active == true or current_user_active %}
+                        <span class="span2">Active, </span>
+                        {% else %}
+                        <span class="span2">Dormant, </span>
+                        {% endif %}
+                        Member.
+                    </p>
+                </div>
+            </div>
+            <div class="nav dashbord">
+                <ul>
+                    <li>
+                        <i class="fa-solid fa-house"></i>
+                        <a href="{% url 'dashboard' %}">Dashboard</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="nav dashbord">
+                <ul>
+                    <li>
+                        <i class="fa-solid fa-user"></i>
+                        <a href="{% url 'profile' %}">My Profile</a>
+                    </li>
+                </ul>
+            </div>
+
+
+            <div class="nav dashbord">
+                <ul>
+                    <li>
+                        <div class="chevLeftDown">
+                            <div class="chev">
+                                <i class="fa-solid fa-gear"></i>
+                                <a href="#">Accounts</a>
+                            </div>
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </div>
+                        <ul class="dropdown-content" id="accountsDropdownContent">
+                            <li>
+                                <a href="{% url 'accounts' %}?accounts=myAccountArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> My Account
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'accounts' %}?accounts=fundsTransferArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> Share Transfer
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'accounts' %}?accounts=adjustedContributionArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> Adjust Contributions
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'accounts' %}?accounts=benovelentClaimArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> Benevolent Claim
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'accounts' %}?accounts=accountStatementArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> Account Statements
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'accounts' %}?accounts=blockAccountArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> Block Account
+                                </a>
+                            </li>
+                        </ul>                        
+                    </li>
+                </ul>
+            </div>   
+            
+            
+            <div class="nav dashbord">
+                <ul>
+                    <li>
+                        <div class="chevLeftDown">
+                            <div class="chev">
+                                <i class="fa-solid fa-bag-shopping"></i>
+                                <a href="#" id="loansLink">Loans</a>
+                            </div>
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </div>
+                        <ul class="dropdown-content" id="loansDropdownContent">
+                            <li>
+                                <a href="{% url 'loans' %}?loans=myLoansArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> My Loans
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'loans' %}?loans=loanApplicationArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> Loan Application
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'loans' %}?loans=loanRepaymentArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> Loan Repayment
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'loans' %}?loans=guaranteedLoansArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> Guaranteed Loans
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'loans' %}?loans=guarantorEligibilityArticle" class="dd">
+                                    <i class="fa-solid fa-link"></i> Guarantor Eligibility
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            
+            
+            
+            <div class="nav dashbord">
+                <ul>
+                    <li>
+                        <i class="fa-solid fa-circle-info"></i>
+                        <a href="{% url 'faq' %}">FAQ</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="nav logout">
+                <ul>
+                    <li>
+                        <i class="fa fa-sign-out" aria-hidden="true"></i> 
+                        <a href="{% url 'logout' %}">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </section> 
+       
+
+    </aside>
+
+
+    <main class="membersPortalMain">
+        {% block content %}
+            Replace Me
+        {% endblock %}
+    </main>
+
+
+    <footer class="membersPortalFooter auth-footer">
+        <small id="copyright">
+            &copy; Parkside Villa Welfare Group. All rights reserved.
+        </small>
+        <script>
+            const currentYear = new Date().getFullYear();
+            document.getElementById('copyright').innerHTML = `&copy; ${currentYear} Parkside Villa Welfare Group. All rights reserved.`;
+        </script>
+        <div class="text-logo-builder">
+            Powered by <a href="https://hamiscodecraft.co.ke"><span class="FI">Ka<span class="LI">tana</span>.</span></a>
+        </div>
+    </footer>
+ 
+    <script src="../../static/javascript/memberMain9.js"></script> 
+ 
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const mobileMenuIcon = document.querySelector('.left-mobile');
+            const asideBar = document.querySelector('.membersPortalAside');
+            const asideIntro = document.querySelector('.aside-intro');
+            
+            mobileMenuIcon.addEventListener('click', function () {
+                asideBar.classList.toggle('show');
+                if (asideBar.classList.contains('show')) {
+                    mobileMenuIcon.innerHTML = "<i class='fa-solid fa-times' style='font-size: 2.4rem; color: darkred; font-weight: bold; transition: 0.7s ease-in-out;'></i>";
+                    asideIntro.style.display = 'none';
+                } else {
+                    mobileMenuIcon.innerHTML = "<i class='fa-solid fa-bars' style='transition: 0.7s ease-in-out;'></i>";
+                    asideIntro.style.display = 'flex';
+                }
+            });
+        });        
+    </script>
+    <style>
+        .membersPortalAside.show {
+            display: block;
+            width: 100%;
+            z-index: 900;
+            height: 90vh; 
+            left: 0;
+            top: 5%;
+            bottom: 10%;
+            padding: 10vw 5vw;
+            overflow-y: auto;
+        }
+    </style>
+    
+    
+
+</body>
+</html>

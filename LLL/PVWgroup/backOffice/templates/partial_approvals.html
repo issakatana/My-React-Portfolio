@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Partial-html</title>
+</head>
+<body>
+<!-- partial_approvals.html -->
+<div id="schedulesContainer">
+    <!-- Display the fetched schedules here -->
+    <table class="tbl">
+        <thead>
+            <tr>
+                <th>Member Number</th>
+                <th>Duration</th>
+                <th>Interest</th>
+                <th>Amount Due</th>
+                <th>Installment</th>
+                <th>Loan Principal</th>
+                <th>Months Remaining</th>
+                <th>Maturity Date</th>
+                <th>Is Paid<b>?</b></th>
+                <!-- Add more table headers as needed -->
+            </tr>
+        </thead>
+        <tbody>
+            {% for loan in welfare_loans %}
+            <tr>
+           
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

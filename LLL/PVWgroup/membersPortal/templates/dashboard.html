@@ -1,0 +1,233 @@
+{% extends 'membersBase.html' %}
+
+{% block content %}
+
+<section class="container account-section">
+    <article class="summaries">
+        <div class="recent-tran-table-head profile-tittle">
+            <p>Account Summary</p>
+            <div class="tran-sammary-table-icons">
+                
+            </div>
+        </div>
+        <summary class="account-summary my-accounts">
+            <div class="summary">
+                <div class="valuedata">
+                    <p>Total Savings</p>
+                    <p>{{ shares_balance }}<span class="selected-currency">KES</span></p>
+                </div>
+                <figure id="profile-container" style="width: 40px; height: 40px; overflow: hidden; border-radius: 50%;margin-left:1vw;">
+                    <img id="profile-image" src="../../static/images/pics/deposit-ico.svg" alt="Profile Picture" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />
+                </figure> 
+            </div>
+
+            <div class="summary">
+                <div class="valuedata">
+                    <p>Outstanding Loan Principal</p>
+                    <p>{{ outstanding_loan_principal }} <span class="selected-currency">KES</span></p>
+                </div>
+                <figure id="profile-container" style="width: 40px; height: 40px; overflow: hidden; border-radius: 50%;margin-left:1vw;">
+                    <img id="profile-image" src="../../static/images/pics/credit.svg" alt="Profile Picture" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />
+                </figure> 
+            </div>
+
+            <div class="summary">
+                <div class="valuedata">
+                    <p>Outstanding Loan Interest</p>
+                    <p>{{ outstanding_loan_interest }} <span class="selected-currency">KES</span></p>
+                </div>
+                <figure id="profile-container" style="width: 40px; height: 40px; overflow: hidden; border-radius: 50%;margin-left:1vw;">
+                    <img id="profile-image" src="../../static/images/pics/withdraw-icon.svg" alt="Profile Picture" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />
+                </figure> 
+            </div>
+        </summary>
+    </article>
+    <article class="tbl_container">
+        <div class="recent-tran-table-head profile-tittle">
+            <p>Recent Activity</p>
+            <div class="tran-sammary-table-icons">
+                <i class='bx bx-filter' ></i>
+                <i class='bx bxs-download'></i>
+                <i class='bx bxs-printer' ></i>
+            </div>
+        </div>
+        <table class="tbl">
+            <thead>
+                <tr>
+                    <th>Transaction Date</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if transactions %}
+                    {% for transaction in transactions %}
+                        <tr>
+                            <td>{{ transaction.posting_date }}</td>
+                            <td>{{ transaction.description }}</td>
+                            <td>
+                                {% if transaction.credit %}
+                                    {{ transaction.credit }}
+                                {% elif transaction.debit %}
+                                    -{{ transaction.debit }}
+                                {% else %}
+                                    0.00
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="3">You don't have any recent activity at the moment.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>                  
+    </article>
+</section>
+
+<style>
+
+</style>
+
+<style>
+    .container {
+        width: 100%;
+        background: #fff;
+    }
+    .tbl_container {
+        grid-area: main; 
+        /* overflow-y: auto; */
+        max-height: 70vh;
+        margin-top: 1em; 
+    }
+    .tbl_container h2 {
+        font-size: 1.2rem;
+    }
+    .tbl {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1em;
+    }
+    .tbl thead {
+        background: #662368;
+        color: #fff;
+    }
+    .tbl thead tr th {
+        font-size: 0.9rem;
+        padding: 0.8rem;
+        letter-spacing: 0.2rem;
+        vertical-align: top;
+        border: 1px solid #aab7b8;
+    }
+    .tbl tbody tr td {
+        font-size: 1rem;
+        left: 0.2rem;
+        font-weight: normal;
+        text-align: center;
+        border-top: 1px solid #aab7b8;
+        padding: 0.8rem;
+    }
+    .tbl tr:nth-child(even) {
+        background: #ccc;
+    }
+    .tbl tr:hover td {
+        background: #839192;
+        color: #000;
+        transition: all 0.3s ease-in;
+        cursor: pointer;
+    }
+    .tbl button {
+        display: inline-block;
+        border: none;
+        margin: 0 auto;
+        padding: 0.4rem;
+        border-radius: 1px;
+        outline: none;
+        cursor: pointer;
+    }
+    .btn_trash {
+        background: #e74c3c;
+        color: #fff;
+    }
+    .btn_edit {
+        background: #1e8449;
+        color: #fff;
+    }
+    @media (max-width:768px) {
+        .tbl thead {
+            display: none;
+        }
+        .tbl tr, .tbl td {
+            display: block;
+            width: 100%;
+        }
+        .tbl tr {
+            margin-bottom: 1rem;
+        }
+        .tbl tbody tr td {
+            text-align: right;
+            padding-right: 1.2rem;
+            position: relative;
+        }
+        .tbl td::before {
+            content: attr(data-lable);
+            position: absolute;
+            left: 0;
+            width: 50%;
+            text-align: left;
+            padding-left: 1.2rem;
+        }
+    }
+</style>
+
+
+<style>
+    .profile-tittle p {
+        color: #1e8449;
+    }
+</style>
+
+<style>
+    .profile-tittle p {
+        padding-left: 5vw;
+    }
+    .my-accountl, .my-accounts,
+    .grid-display {
+        display: none;
+        gap: 2rem;
+        --min-column-size:15rem;
+        grid-template-columns: repeat(auto-fit, minmax(min(var(--min-column-size), 100%), 1fr));
+        padding: 1vw 3vw;
+        place-items: center;
+    }
+    .my-accounts {
+        display: grid;
+    }
+    .summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-flow: row nowrap;
+        gap: 30px;
+        width: 90%;
+        border: 1px solid whitesmoke;
+        padding: 2vw;
+        border-radius: 10px;
+    }
+    .summary p {
+        font-size: .9rem;
+    }
+    .dropdown-select-toggle {
+        display: flex;
+        justify-content: center;
+        flex-flow: column nowrap;
+        gap: 1rem;
+        padding-left: 8vw;
+    }
+    .dropdown-select-toggle i {
+        padding-left: 1vw;
+    }
+</style>
+
+{% endblock %}

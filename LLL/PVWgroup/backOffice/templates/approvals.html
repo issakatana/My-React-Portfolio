@@ -1,0 +1,1031 @@
+{% extends 'adminBase.html' %}
+
+{% block content %}
+
+<section class="approvals-section" id="approvalsSection">
+   
+    <!-- new created accounts start -->
+    <article class="newAccountsCreated admin-approvals" id="newAccountsCreated">
+        <div class="my-member-tittle profile-tittle">
+            <p>Pending Accounts To Review: </p>
+        </div>
+        <label for="filterSelect"><i class='bx bx-filter'></i>Filter by:</label>
+        <select id="filterSelect">
+            <option value="all">All</option>
+            <option value="blocked">Blocked</option>
+            <option value="not_approved">Not Approved</option>
+        </select>
+        <table class="tbl">
+            <thead>
+                <tr>
+                    <th>Full Name</th>
+                    <th>Username</th>
+                    <th>Member Number</th>
+                    <th>Phone Number</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for new_account in new_accounts %}
+                   <tr data-status="{{ new_account.status }}" data-is-approved="{% if new_account.is_approved %}true{% else %}false{% endif %}">
+                        <td>{{ new_account.member.personal_details.get_full_name|default:"N/A" }}</td>
+                        <td>{{ new_account.username }}</td>
+                        <td>{{ new_account.member_number }}</td>
+                        <td>{{ new_account.member.contact_details.phoneno|default:"N/A" }}</td>
+                        {% if new_account.status == 'Blocked' %}
+                            <td>
+                                <button class="unblockMember" unblock-data-member-id="{{ new_account.member.id }}">Unblock Member</button>
+                            </td>
+                        {% elif not new_account.is_approved %}
+                            <td>
+                                <button class="approveMember" approve-data-member-id="{{ new_account.member.id }}">Approve Member</button>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                {% if not new_accounts %}
+                    <tr>
+                        <td colspan="5">No new accounts created at this moment.</td>
+                    </tr>
+                {% endif %}
+            </tbody>            
+        </table>        
+        <div class="overlay" id="overlay">
+            <div class="popup">
+                <div class="closebtn">
+                    <a href="#" id="popupCloseButton"><i class="fa fa-times" aria-hidden="true"></i></a>
+                    <a href="#"><i class="fa fa-question" aria-hidden="true"></i></a>
+                </div>
+                <div id="popupContent">
+                    <!-- Member details will be shown here -->
+                </div>
+                <button id="popupPrevButton" style="display: none;">Back</button>
+                <button id="popupNextButton">Next</button>
+                <button id="popupRejectButtonAcc" class="popupRejectButtonAcc" style="display: none;">
+                    <a href='#' id="rejectLinkAcc" class="rejectLink" data-rejectAccountCreatedLoan-url="{% url 'reject_accountCreated_request' member_id=1 %}">Reject</a>
+                </button>
+                <button id="popupApproveButton" style="display: none;">
+                    <a href='#' id="approveLink" class="approveLink" data-url="{% url 'approve_member' member_id=1 %}">Approve</a>
+                </button>               
+            </div>
+        </div>
+
+        <script>
+            $(document).ready(function () {
+                // Retrieve the filter value from localStorage
+                const storedFilter = localStorage.getItem('selectedFilter');
+        
+                // Set the initial value based on storedFilter or default to 'all'
+                $('#filterSelect').val(storedFilter || 'all');
+        
+                // Function to handle filter change
+                $('#filterSelect').change(function () {
+                    const selectedFilter = $(this).val();
+        
+                    // Store the selected filter in localStorage
+                    localStorage.setItem('selectedFilter', selectedFilter);
+        
+                    // Show/hide rows based on filter
+                    $('tbody tr').each(function () {
+                        const status = $(this).data('status');
+                        const isApproved = $(this).data('is-approved') === 'true';
+        
+                        if (
+                            (selectedFilter === 'blocked' && status === 'Blocked') ||
+                            (selectedFilter === 'not_approved' && !isApproved && status !== 'Blocked') ||
+                            selectedFilter === 'all'
+                        ) {
+                            $(this).show();
+                        } else {
+                            $(this).hide();
+                        }
+                    });
+                });
+        
+                // Trigger the change event on page load to apply the initial filter
+                $('#filterSelect').trigger('change');
+            });
+        </script>
+    </article>
+    <!-- new created accounts end -->
+
+    <!-- -------------------------------------------benovelent contribution schedule start--------------------------------------------- -->
+    <article class="benovelentContributions admin-approvals" id="benovelentContributions">
+        <div class="my-member-tittle profile-tittle">
+            <p class="tooltip-trigger" id="defaultcl">Benevolent Claims<i class="fa fa-chevron-down" aria-hidden="true"></i></p>
+            <div class="tooltip">
+                <span onclick="benevolentContributions('benevolentClaims')">Benevolent Claims</span>
+                <span onclick="benevolentContributions('benevolentContribution')">Benevolent Contribution Schedule</span>
+            </div>
+        </div>
+        <div class="benovelentClaims" id="benevolentClaims">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Full Name</th>
+                        <th>Username</th>
+                        <th>Member Number</th>
+                        <th>Phone Number</th>
+                        <th>Residence</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for benevolent_claim in  benevolent_claims  %}
+                        <tr>
+                            <td>{{  benevolent_claim.member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{  benevolent_claim.member.user.username }}</td>
+                            <td>{{  benevolent_claim.member.user.member_number }}</td>
+                            <td>{{  benevolent_claim.member.contact_details.phoneno }}</td>
+                            <td>{{  benevolent_claim.member.contact_details.residence }}</td>
+                            <td>
+                                <button class="approveBenevolentClaim" data-benevolentClaim-id="{{ benevolent_claim.id }}">Review Claim</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if not  benevolent_claims %}
+                        <tr>
+                            <td colspan="6">No benevolent claims at this moment.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            <div class="overlayclm overlay" id="overlayclm">
+                <div class="popupclm popup">
+                    <div class="closebtn">
+                        <a href="#" id="popupCloseButtonclm"><i class="fa fa-times" aria-hidden="true"></i></a>
+                        <a href='#' id="processTitleLink" class="processTitleLink">Benevolent Claim Review</a>
+                    </div>
+                    <div id="benevolentPopupContent">
+                        <!-- Member details will be shown here -->
+                    </div>
+                    <button id="popupPrevButtonclm" style="display: none;">Back</button>
+                    <button id="popupNextButtonclm">Next</button>
+                    <button id="popupRejectButtonclm" class="popupRejectButtonclm" style="display: none;">
+                        <a href='#' id="rejectLinkclm" class="rejectLink" data-rejectBenevolentClaim-url="{% url 'reject_benevolentClaim_request' id=1 %}">Reject</a>
+                    </button>
+                    <button id="popupApproveButtonclm" style="display: none;">
+                        <a href='#' id="approveLinkclm" class="approveLink" data-approveBenevolentClaim-url="{% url 'approve_benevolent_claim' id=1 %}">Approve</a>
+                    </button>               
+                </div>
+            </div>                        
+        </div>
+        <div class="benovelentContributions statements" id="benevolentContributionsSchedule">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Full Name</th>
+                        <th>Username</th>
+                        <th>Member Number</th>
+                        <th>Phone Number</th>
+                        <th>Benovelent Contribution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for benovelent_contribution_schedule in  benovelent_contribution_schedules  %}
+                        <tr>
+                            <td>{{ benovelent_contribution_schedule.member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{ benovelent_contribution_schedule.member.user.username }}</td>
+                            <td>{{ benovelent_contribution_schedule.member.user.member_number }}</td>
+                            <td>{{ benovelent_contribution_schedule.member.contact_details.phoneno }}</td>
+                            <td>{{ benovelent_contribution_schedule.benov_amount }}</td>
+                        </tr>
+                    {% endfor %}
+                    {% if not benovelent_contribution_schedules %}
+                        <tr>
+                            <td colspan="7">No benovelent contribution schedule at this moment.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    <!--------------------------------------------- benovelent contribution schedule end -----------------------------------------------------> 
+
+
+    <!-- --------------------------------- share contribution schedules and adjusted contributions start ------------------------------------->
+
+    <!-- share contribution schedules start -->
+    <article class="adjustedContributions admin-approvals" id="adjustedContributions">
+        <div class="my-member-tittle profile-tittle">
+            <p class="tooltip-trigger" id="default">Shares Contribution Schedule <i class="fa fa-chevron-down" aria-hidden="true"></i></p>
+            <div class="tooltip">
+                <span onclick="showShareContributions('sharesContribution')">Shares Contribution Schedule</span>
+                <span onclick="showShareContributions('adjustedContribution')">Adjusted Contribution Requests</span>
+            </div>
+        </div>
+        <div class="sharesContribution statements" id="sharesContributionSchedule">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Full Name</th>
+                        <th>Username</th>
+                        <th>Member Number</th>
+                        <th>Phone Number</th>
+                        <th>Share Contribution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for share_contribution_schedule in share_contribution_schedules %}
+                        <tr>
+                            <td>{{ share_contribution_schedule.member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{ share_contribution_schedule.member.user.username }}</td>
+                            <td>{{ share_contribution_schedule.member.user.member_number }}</td>
+                            <td>{{ share_contribution_schedule.member.contact_details.phoneno }}</td>
+                            <td>{{ share_contribution_schedule.share_amount }}</td>
+                        </tr>
+                    {% endfor %}
+                    {% if not share_contribution_schedules %}
+                        <tr>
+                            <td colspan="7">No contribution schedules at this moment.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <!-- share contribution schedules end -->
+
+        <!-- adjusted contributions start -->
+        <div class="adjustedContribution statements" id="adjustedContributionRequests">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Full Name</th>
+                        <th>Member Number</th>
+                        <th>Phone Number</th>
+                        <th>Request Date</th>
+                        <th>Previous Contribution</th>
+                        <th>New Contribution</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for adjusted_contribution in adjusted_contributions %}
+                        <tr>
+                            <td>{{ adjusted_contribution.member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{ adjusted_contribution.member.user.member_number }}</td>
+                            <td>{{ adjusted_contribution.member.contact_details.phoneno }}</td>
+                            <td>{{ adjusted_contribution.request_date }}</td>
+                            <td>{{ adjusted_contribution.share_amount }}</td>
+                            <td>{{ adjusted_contribution.new_amount }}</td>
+                            <td>
+                                <button class="approveMemberContribution" data-member-id="{{ adjusted_contribution.member.id }}">Approve</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if not adjusted_contributions %}
+                        <tr>
+                            <td colspan="7">No adjusted contributions requests at this moment.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <!-- adjusted contributions end -->
+    </article>
+    <!-- ----------------------------------share contribution schedules and adjusted contributions end ---------------------------------------------- -->
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll(".approveMemberContribution").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    var memberId = this.getAttribute("data-member-id");
+    
+                    fetch("{% url 'approve_contribution' %}", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": getCookie("csrftoken"),
+                        },
+                        body: JSON.stringify({ 'member_id': memberId }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Handle success, e.g., update UI
+                        Swal.fire({
+                            title: "Approval Successful!",
+                            text: "You have successfully updated share contribution.",
+                            icon: "success",
+                            confirmButtonText: "Great!",
+                            timer: 5000, // Auto-close after 5 seconds
+                            timerProgressBar: true,
+                            showCloseButton: true,
+                            showConfirmButton: false,
+                            allowEscapeKey: false,
+                            allowOutsideClick: false,
+                            toast: true,
+                            //position: "top-end",
+                            //background: "#8fb5c3", // Custom background color
+                            customClass: {
+                                title: "sweetalert-title",
+                                content: "sweetalert-content",
+                                closeButton: "sweetalert-close",
+                            },
+                        }).then(() => {
+                            location.reload();
+                        });
+                    })
+                    .catch(error => {
+                        // Handle error, e.g., show an alert
+                        console.error("Error approving contribution:", error.message);
+                    });
+                });
+            });
+    
+            function getCookie(name) {
+                var cookieValue = null;
+                if (document.cookie && document.cookie !== "") {
+                    var cookies = document.cookie.split(";");
+                    for (var i = 0; i < cookies.length; i++) {
+                        var cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + "=")) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+        });
+    </script>
+    
+    <!-- share contribution schedule end -->
+
+  
+
+
+    <article class="accountStatements admin-approvals" id="accountStatements">
+        <div class="my-member-tittle profile-tittle">
+            <p class="tooltip-trigger" id="defaulta">Welfare Statement Schedule <i class="fa fa-chevron-down" aria-hidden="true"></i></p>
+            <div class="tooltip">
+                <span onclick="showStatement('welcome')">Welfare Statement Schedule</span>
+                <span onclick="showStatement('user')">Member Transactions Statement Schedule</span>
+            </div>
+        </div>
+        <div class="welfare-statement statements" id="welcomeStatement">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Full Name</th>
+                        <th>Benovelent</th>
+                        <th>Shares</th>
+                        <th>Normal Loan</th>
+                        <th>Salary Advance Loan</th>
+                        <th>Outstanding Loan</th>
+                        <th>Welfare</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for member in members_data %}
+                        <tr>
+                            <td>{{ member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{ member.benovelent_contribution }}</td>
+                            <td>{{ member.shares_contribution }}</td>
+                            <td>{{ member.normal_loan }}</td>
+                            <td>{{ member.salary_advance_loan }}</td>
+                            <td>{{ member.loan_outstanding }}</td>
+                            <td>{{ member.welfare }}</td>
+                        </tr>
+                    {% endfor %}
+                    {% if not members_data %}
+                        <tr>
+                            <td colspan="7">No members data available.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="user-statement statements" id="userStatement">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Posting Date</th>
+                        <th>Full Name</th>
+                        <th>Member Number</th>
+                        <th>Activity Type</th>
+                        <th>Description</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                        <th>Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                        <tr>
+                            <td>{{ transaction.posting_date }}</td>
+                            <td>{{ transaction.member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{ transaction.member.user.member_number }}</td>
+                            <td>{{ transaction.activity_type }}</td>
+                            <td>{{ transaction.description }}</td>
+                            <td>{{ transaction.debit }}</td>
+                            <td>{{ transaction.credit }}</td>
+                            <td>{{ transaction.balance }}</td>
+                        </tr>
+                    {% endfor %}
+                    {% if not transactions %}
+                        <tr>
+                            <td colspan="8">No Member Transactions at the moment.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    
+    <!------------------------------------- Advance Loan and Welfare Loans Approvals requests Start-------------------------------- -->
+    <article class="requestedLoans admin-approvals" id="requestedLoans">
+        <div class="my-member-tittle profile-tittle">
+            <p class="tooltip-trigger" id="defaultLR">Advance Loan Unapproved Requests: <i class="fa fa-chevron-down" aria-hidden="true"></i></p>
+            <div class="tooltip">
+                <span onclick="showLoanRequests('advanceLoanRequest')">Advance Loan Unapproved Requests </span>
+                <span onclick="showLoanRequests('welfareLoanRequest')">Welfare Loan Unapproved Requests </span>
+            </div>
+        </div>
+
+        <!-- advance loan approval start -->
+        <div class="advanceLoanRequest statements" id="advanceLoanRequest">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Date Requested</th>
+                        <th>Full Name</th>
+                        <th>Member Number</th>
+                        <th>Amount Borrowed</th>
+                        <th>Loan Interest</th>
+                        <th>Amount Repayable</th>
+                        <th>Due Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for  advance_loan_unapproved_request in  advance_loan_unapproved_requests %}
+                        <tr>
+                            <td>{{ advance_loan_unapproved_request.date_requested }}</td>
+                            <td>{{ advance_loan_unapproved_request.member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{ advance_loan_unapproved_request.member.user.member_number|default:"N/A" }}</td>
+                            <td>{{ advance_loan_unapproved_request.borrowed_amount }}</td>
+                            <td>{{ advance_loan_unapproved_request.interest }}</td>
+                            <td>{{ advance_loan_unapproved_request.amount_to_be_paid }}</td>
+                            <td>{{ advance_loan_unapproved_request.maturity_date }}</td>
+                            <td>
+                                <button class="approveAdvanceLoan" data-advanceLoan-id="{{ advance_loan_unapproved_request.loan_id }}">Approve Loan</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if not  advance_loan_unapproved_requests %}
+                        <tr>
+                            <td colspan="8">No advance loan requested at this moment.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            <div class="overlayadv overlay" id="overlayadv">
+                <div class="popupadv popup">
+                    <div class="closebtn">
+                        <a href="#" id="popupCloseButtonadv"><i class="fa fa-times" aria-hidden="true"></i></a>
+                        <a href='#' id="processTitleLink" class="processTitleLink">Advance Loan Review</a>
+                    </div>
+                    <div id="advancePopupContent">
+                        <!-- Member details will be shown here -->
+                    </div>
+                    <button id="popupPrevButtonadv" style="display: none;">Back</button>
+                    <button id="popupNextButtonadv">Next</button>
+                    <button id="popupRejectButtonadv" class="popupRejectButtonadv" style="display: none;">
+                        <a href='#' id="rejectLink" class="rejectLink" data-rejectAdvanceLoan-url="{% url 'reject_advanceLoan_request' loan_id=1 %}">Reject</a>
+                    </button>
+                    <button id="popupApproveButtonadv" style="display: none;">
+                        <a href='#' id="approveLinkadv" class="approveLink" data-approveAdvanceLoan-url="{% url 'approve_advance_loan' loan_id=1 %}">Approve</a>
+                    </button>               
+                </div>
+            </div>
+        </div>
+        <!-- advance loan approval End -->
+
+        <!-- welfare loan approval Start -->
+        <div class="welfareLoanRequest statements" id="welfareLoanRequest">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Date Requested</th>
+                        <th>Full Name</th>
+                        <th>Member Number</th>
+                        <th>Amount Borrowed</th>
+                        <th>Installment</th>
+                        <th>Duration</th>
+                        <th>Amount Repayable</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for  welfare_loan_unapproved_request in  welfare_loan_unapproved_requests %}
+                        <tr>
+                            <td>{{ welfare_loan_unapproved_request.date_requested }}</td>
+                            <td>{{ welfare_loan_unapproved_request.member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{ welfare_loan_unapproved_request.member.user.member_number|default:"N/A" }}</td>
+                            <td>{{ welfare_loan_unapproved_request.borrowed_amount }}</td>
+                            <td>{{ welfare_loan_unapproved_request.installment }}</td>
+                            <td>{{ welfare_loan_unapproved_request.duration_months }}</td>
+                            <td>{{ welfare_loan_unapproved_request.loan_amount_to_be_paid }}</td>
+                            <td>
+                                <button class="approveWelfareLoan" data-welfareLoan-id="{{ welfare_loan_unapproved_request.loan_id }}">Approve Loan</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if not  welfare_loan_unapproved_requests %}
+                        <tr>
+                            <td colspan="9">No welfare loan requested at this moment.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            <div class="overlaywel overlay" id="overlaywel">
+                <div class="popupwel popup">
+                    <div class="closebtn">
+                        <a href="#" id="popupCloseButtonwel"><i class="fa fa-times" aria-hidden="true"></i></a>
+                        <a href='#' id="processTitleLink" class="processTitleLink">Welfare Loan Review</a>
+                    </div>
+                    <div id="welfarePopupContent">
+                        <!-- Member details will be shown here -->
+                    </div>
+                    <button id="popupPrevButtonwel" style="display: none;">Back</button>
+                    <button id="popupNextButtonwel">Next</button>
+                    <button id="popupRejectButtonwel" class="popupRejectButtonwel" style="display: none;">
+                        <a href='#' id="rejectLinkwel" class="rejectLink" data-rejectWelfareLoan-url="{% url 'reject_welfareLoan_request' loan_id=1 %}">Reject</a>
+                    </button>
+                    <button id="popupApproveButtonwel" style="display: none;">
+                        <a href='#' id="approveLinkwel" class="approveLink" data-approveWelfareLoan-url="{% url 'approve_welfare_loan' loan_id=1 %}">Approve</a>
+                    </button>               
+                </div>
+            </div>            
+        </div>
+        <!-- welfare loan approval End -->
+    </article>
+    <!------------------------------------- Advance Loan and Welfare Loans Approvals requests End-------------------------------- -->
+
+    <article class="loanRepayment admin-approvals" id="loanRepayment">
+        <div class="my-member-tittle profile-tittle">
+            <p class="tooltip-trigger" id="defaultLRP">Loan Repayment Schedules: <i class="fa fa-chevron-down" aria-hidden="true"></i></p>
+            <div class="tooltip">
+                <span onclick="showLoanRepayment('advanceLoanRunning')">Running Advance Loans </span>
+                <span onclick="showLoanRepayment('welfareLoanRunning')">Running Welfare Loans </span>
+                <span onclick="showLoanRepayment('advanceLoanRepayment')">Advance Loan Unapproved Repayment </span>
+                <span onclick="showLoanRepayment('welfareLoanRepayment')">Welfare Loan Unapproved Repayment </span>
+                <span onclick="showLoanRepayment('loanRepaymentSchedules')">Loan Repayment Schedules </span>
+            </div>
+        </div>
+        <div class="loanRepaymentSchedules statements" id="loanRepaymentSchedules">
+            <form id="filterForm" action="{% url 'filter_schedules' %}" method="post" class="filter-form">
+                {% csrf_token %}
+                
+                <div class="input-group">
+                    <label for="filterCriteria"><b>Filter:</b></label>
+                    <select name="member_filter" id="filterCriteria" required>
+                        <option value="none">Choose a filter criteria...</option>
+                        <option value="all">All</option>
+                        <option value="member">Member</option>
+                    </select>
+                </div>
+                
+                <div class="input-group" id="memberNumberGroup">
+                    <label for="memberNumber">Member Number</label>
+                    <input type="text" name="member_number" id="memberNumber">
+                </div>
+                
+                <div class="input-group">
+                    <label for="startDate"><b>Filter by Date:</b></label>
+                    <span>from</span>
+                    <input type="date" name="start_date" id="startDate" required>
+                    <span> to </span>
+                    <input type="date" name="end_date" id="endDate" required>
+                </div>
+                
+                <div class="input-group input-query-btn">
+                    <input type="submit" value="Query Schedules">
+                </div>
+            </form>            
+            <h3>Filtered Schedules:</h3>
+            <div id="schedulesContainer">
+               
+            </div>
+            <script>
+                document.getElementById('filterForm').addEventListener('submit', function (event) {
+                    event.preventDefault(); // Prevent the form from submitting in the traditional way
+            
+                    // Get form data
+                    const formData = new FormData(event.target);
+            
+                    // Conditionally remove member_number field if "All" is selected
+                    const filterCriteria = formData.get('member_filter');
+                    if (filterCriteria === 'all') {
+                        formData.delete('member_number');
+                    }
+            
+                    // Fetch data
+                    fetch('{% url "filter_schedules" %}', {
+                        method: 'POST',
+                        body: formData,
+                    })
+                    .then(response => response.json())  // Assuming the response is in JSON format
+                    .then(data => {
+                        // Print the fetched data to the console for debugging
+                        console.log('Fetched Data:', data);
+                        // Update the HTML content with the fetched data
+                        document.getElementById('schedulesContainer').innerHTML = data.html_content;
+                        
+                        // Clear form fields after submission
+                        document.getElementById('filterForm').reset();
+                    })
+                    .catch(error => {
+                        console.error('Error fetching data:', error);
+                    });
+                });
+            </script>
+            
+            
+            
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    // Get references to the filter criteria and member number input
+                    const filterCriteria = document.getElementById('filterCriteria');
+                    const memberNumberInput = document.getElementById('memberNumberGroup');
+            
+                    // Function to toggle the display and disabled attributes of the member number input
+                    function toggleMemberNumberInput() {
+                        memberNumberInput.style.display = filterCriteria.value === 'member' ? 'block' : 'none';
+                        memberNumberInput.disabled = filterCriteria.value !== 'member';
+                    }
+            
+                    // Initial setup to hide and disable the member number input
+                    memberNumberInput.style.display = 'none';
+                    toggleMemberNumberInput();
+            
+                    // Add an event listener to the filter criteria to update the member number input
+                    filterCriteria.addEventListener('change', toggleMemberNumberInput);
+                });
+            </script>       
+        </div>
+        <div class="advanceLoanRunning statements" id="advanceLoanRunning">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Date Disbursed</th>
+                        <th>Due Date</th>
+                        <th>Loan ID</th>
+                        <th>Full Name</th>
+                        <th>Member Number</th>
+                        <th>Amount Borrowed</th>
+                        <th>Loan Interest</th>
+                        <th>Amount Repayable</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for  advance_loan_running in  advance_loan_runnings %}
+                        <tr>
+                            <td>{{ advance_loan_running.date_requested }}</td>
+                            <td>{{ advance_loan_running.member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{ advance_loan_running.member.user.member_number|default:"N/A" }}</td>
+                            <td>{{ advance_loan_running.borrowed_amount }}</td>
+                            <td>{{ advance_loan_running.borrowed_amount }}</td>
+                            <td>{{ advance_loan_running.interest }}</td>
+                            <td>{{ advance_loan_running.amount_to_be_paid }}</td>
+                            <td>{{ advance_loan_running.maturity_date }}</td>
+                            <td>
+                                <a href="#" style="color: #066638;font-weight: bold;">Running</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if not advance_loan_runnings %}
+                        <tr>
+                            <td colspan="8">No advance loan Running at this moment.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="welfareLoanRunning statements" id="welfareLoanRunning">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Date Disbursed</th>
+                        <th>Due Date</th>
+                        <th>Loan ID</th>
+                        <th>Full Name</th>
+                        <th>Member Number</th>
+                        <th>Amount Borrowed</th>
+                        <th>Loan Interest</th>
+                        <th>Amount Repayable</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for welfare_loan_running in welfare_loan_runnings %}
+                        <tr>
+                            <td>{{ welfare_loan_running.date_requested }}</td>
+                            <td>{{ welfare_loan_running.member.personal_details.get_full_name|default:"N/A" }}</td>
+                            <td>{{ welfare_loan_running.member.user.member_number|default:"N/A" }}</td>
+                            <td>{{ welfare_loan_running.borrowed_amount }}</td>
+                            <td>{{ welfare_loan_running.borrowed_amount }}</td>
+                            <td>{{ welfare_loan_running.interest }}</td>
+                            <td>{{ welfare_loan_running.amount_to_be_paid }}</td>
+                            <td>{{ welfare_loan_running.maturity_date }}</td>
+                            <td>
+                                <a href="#" style="color: #066638;font-weight: bold;">Running</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if not welfare_loan_runnings %}
+                        <tr>
+                            <td colspan="8">No welfare loan Running at this moment.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>            
+        </div>
+        <div class="advanceLoanRepayment statements" id="advanceLoanRepayment">
+            <h1>ALRP</h1>
+        </div>
+        <div class="welfareLoanRepayment statements" id="welfareLoanRepayment">
+            <h1>WLRP</h1>
+        </div>
+    </article>
+
+    <article class="guarantorEligibility admin-approvals" id="guarantorEligibility">
+        <p>Guarantor Eligibility:</p>
+    </article>
+
+</section>
+
+<script>
+    function showStatement(statementType) {
+        if (statementType === 'welcome') {
+            document.getElementById('welcomeStatement').style.display = 'block';
+            document.getElementById('userStatement').style.display = 'none';
+            document.getElementById('defaulta').innerHTML = '<p class="tooltip-trigger" id="default">Welfare Statement Schedule <i class="fa fa-chevron-down" aria-hidden="true"></i></p>'; 
+        } else {
+            document.getElementById('welcomeStatement').style.display = 'none';
+            document.getElementById('userStatement').style.display = 'block';
+            document.getElementById('defaulta').innerHTML = '<p class="tooltip-trigger" id="default">Member Transactions Statement Schedule <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        }
+    }
+    function benevolentContributions(statementType) {
+        if (statementType === 'benevolentClaims') {
+            document.getElementById('benevolentClaims').style.display = 'block';
+            document.getElementById('benevolentContributionsSchedule').style.display = 'none';
+            document.getElementById('defaultcl').innerHTML = '<p class="tooltip-trigger" id="default">Benevolent Claims <i class="fa fa-chevron-down" aria-hidden="true"></i></p>'; 
+        } else {
+            document.getElementById('benevolentClaims').style.display = 'none';
+            document.getElementById('benevolentContributionsSchedule').style.display = 'block';
+            document.getElementById('defaultcl').innerHTML = '<p class="tooltip-trigger" id="default">Benevolent Contribution Schedule <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        }
+    }
+    function showShareContributions(statementType) {
+        if (statementType === 'sharesContribution') {
+            document.getElementById('sharesContributionSchedule').style.display = 'block';
+            document.getElementById('adjustedContributionRequests').style.display = 'none';
+            document.getElementById('default').innerHTML = '<p class="tooltip-trigger" id="default">Shares Contribution Schedule <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        } else {
+            document.getElementById('sharesContributionSchedule').style.display = 'none';
+            document.getElementById('adjustedContributionRequests').style.display = 'block';
+            document.getElementById('default').innerHTML = '<p class="tooltip-trigger" id="default">Adjusted Contribution Requests <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        }
+    }
+    function showLoanRequests(statementType) {
+        if (statementType === 'advanceLoanRequest') {
+            document.getElementById('advanceLoanRequest').style.display = 'block';
+            document.getElementById('welfareLoanRequest').style.display = 'none';
+            document.getElementById('defaultLR').innerHTML = '<p class="tooltip-trigger" id="default">Advance Loan Unapproved Requests <i class="fa fa-chevron-down" aria-hidden="true"></i></p>'; 
+        } else {
+            document.getElementById('advanceLoanRequest').style.display = 'none';
+            document.getElementById('welfareLoanRequest').style.display = 'block';
+            document.getElementById('defaultLR').innerHTML = '<p class="tooltip-trigger" id="default">Welfare Loan Unapproved Requests <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        }
+    }
+    function showLoanRepayment(statementType) {
+        if (statementType === 'loanRepaymentSchedules') {
+            document.getElementById('loanRepaymentSchedules').style.display = 'block';
+            document.getElementById('advanceLoanRepayment').style.display = 'none';
+            document.getElementById('welfareLoanRepayment').style.display = 'none';
+            document.getElementById('advanceLoanRunning').style.display = 'none';
+            document.getElementById('welfareLoanRunning').style.display = 'none';
+            document.getElementById('defaultLRP').innerHTML = '<p class="tooltip-trigger" id="default">Loan Repayment Schedules <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        } else if (statementType === 'advanceLoanRepayment') {
+            document.getElementById('loanRepaymentSchedules').style.display = 'none';
+            document.getElementById('advanceLoanRepayment').style.display = 'block';
+            document.getElementById('welfareLoanRepayment').style.display = 'none';
+            document.getElementById('advanceLoanRunning').style.display = 'none';
+            document.getElementById('welfareLoanRunning').style.display = 'none';
+            document.getElementById('defaultLRP').innerHTML = '<p class="tooltip-trigger" id="default">Advance Loan Unapproved Repayment <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        } else if (statementType === 'welfareLoanRepayment') {
+            document.getElementById('loanRepaymentSchedules').style.display = 'none';
+            document.getElementById('advanceLoanRepayment').style.display = 'none';
+            document.getElementById('welfareLoanRepayment').style.display = 'block';
+            document.getElementById('advanceLoanRunning').style.display = 'none';
+            document.getElementById('welfareLoanRunning').style.display = 'none';
+            document.getElementById('defaultLRP').innerHTML = '<p class="tooltip-trigger" id="default">Welfare Loan Unapproved Repayment <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        } else if (statementType === 'advanceLoanRunning') {
+            document.getElementById('loanRepaymentSchedules').style.display = 'none';
+            document.getElementById('advanceLoanRepayment').style.display = 'none';
+            document.getElementById('welfareLoanRepayment').style.display = 'none';
+            document.getElementById('advanceLoanRunning').style.display = 'block';
+            document.getElementById('welfareLoanRunning').style.display = 'none';
+            document.getElementById('defaultLRP').innerHTML = '<p class="tooltip-trigger" id="default">Running Advance Loans <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        } else {
+            document.getElementById('loanRepaymentSchedules').style.display = 'none';
+            document.getElementById('advanceLoanRepayment').style.display = 'none';
+            document.getElementById('welfareLoanRepayment').style.display = 'none';
+            document.getElementById('advanceLoanRunning').style.display = 'none';
+            document.getElementById('welfareLoanRunning').style.display = 'block';
+            document.getElementById('defaultLRP').innerHTML = '<p class="tooltip-trigger" id="default">Running Welfare Loans <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+        }
+    }    
+</script>
+
+<style>
+    .tooltip {
+        visibility: hidden;
+        position: absolute;
+        background-color: whitesmoke;
+        color: #333;
+        text-align: center;
+        padding: 5px;
+        border-radius: 5px;
+        z-index: 1;
+        opacity: 0;
+        text-align: justify;
+        font-size: .8rem;
+        transition: opacity 0.3s;
+    }
+
+    .tooltip-trigger:hover + .tooltip,
+    .tooltip:hover {
+        visibility: visible;
+        opacity: 1;
+    }
+    .tooltip span {
+        display: block;
+        margin-bottom: 5px;
+        width: 100%;
+    }
+    .tooltip span:hover {
+        background: #fff;
+        width: 100%;
+        cursor: pointer;
+    }
+    .statements {
+        display: none; 
+    }
+    .welfare-statement,
+    .sharesContribution,
+    .advanceLoanRequest,
+    .loanRepaymentSchedules {
+        display: block;
+    }
+    .filter-form {
+        display: grid;
+        gap: .8rem;
+        --min-column-size: 20rem;
+        grid-template-columns: repeat(auto-fit, minmax(min(var(--min-column-size), 100%), 1fr));  
+    }
+    .input-query-btn input {
+        padding: 20px 25px;
+        border: none;
+        background-color: #066638;
+        color: white;
+        font-size: 1.2rem;
+    }
+</style>
+
+<style>
+    .approvals-section {
+        padding: 1vw;
+    }
+    .overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        justify-content: center;
+        align-items: center;
+        z-index: 1;
+    }
+    .popup {
+        position: relative;
+        background-color: #fff;
+        padding: 20px;
+        width: 90%;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        text-align: center;
+    }
+    .popup:before {
+        content: "";
+        display: inline-block;
+        height: 100%;
+        vertical-align: middle;
+        margin-right: -0.25em; 
+    }
+    .popup button,
+    .popupRejectButtonadv,
+    .popupRejectButtonwel ,
+    .popupRejectButtonclm {
+        background: #066638;
+        border: none;
+        padding: 10px 15px;
+        color: white;
+        font-weight: bold;
+        letter-spacing: .1rem;
+        margin-top: 1.5vw;
+    }
+    .popupRejectButtonadv,
+    .popupRejectButtonwel,
+    .popupRejectButtonAcc, 
+    .popupRejectButtonclm {
+        background: darkred !important;
+    }
+    .closebtn {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100%;
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        width:100%;
+        background: whitesmoke;
+        display: flex;
+        justify-content: space-between;
+        padding: 1vw;
+        align-items: center;
+    }
+    .fa-times {
+        color: red;
+    }
+    .approveLink,
+    .rejectLink {
+        color: #fff;
+    }
+    .processTitleLink {
+        color: #066638;
+        font-weight: bold;
+    }
+    .pending-approval {
+        display: none;
+    }
+    .pending-approvaladv {
+        display: none;
+    }
+    .pending-approvalwel {
+        display: none;
+    }
+    .pending-approvalclm {
+        display: none;
+    }
+    .pending-approval .profile-tittle {
+        margin-top: 1.5vw;
+    }
+    .pending-approval.active {
+        display: block;
+    }
+    .pending-approvaladv.active {
+        display: block;
+    }
+    .pending-approvalwel.active {
+        display: block;
+    }
+    .pending-approvalclm.active {
+        display: block;
+    }
+</style>
+
+<style>
+    .admin-approvals {
+        display: none;
+    }
+    .admin-approvals.active {
+        display: block;
+    }
+</style>
+
+
+<style>
+    .unblockMember,
+    .approveMember,
+    .approveBenevolentClaim {
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+    .unblockMember {
+        color: darkred;
+    }
+    .approveMember,
+    .approveBenevolentClaim {
+        color: #066638;
+    }
+</style>
+
+{% endblock %}
