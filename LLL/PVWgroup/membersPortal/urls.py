@@ -15,12 +15,24 @@ urlpatterns = [
     
     path('get_guarantor_info/<path:member_number>/', views.get_guarantor_info, name='get_guarantor_info'),
 
-    path('handle_loan_submission/', views.handle_loan_submission, name='handle_loan_submission'),
+    path('generate_guarantorship_verification_code/', views.generate_guarantorship_verification_code, name='generate_guarantorship_verification_code'),
+
+    path('verify_mail_sms_code/', views.verify_mail_sms_code, name='verify_mail_sms_code'),
+
+    # path('fetch_verification_codes/', views.fetch_verification_codes, name='fetch_verification_codes'),
+
+    path('handle_loan_submission', views.handle_loan_submission, name='handle_loan_submission'),
+
+    
     path('check_AdvanceloanEligibility_withSalary/<str:salary>/', views.check_AdvanceloanEligibility_withSalary, name='check_AdvanceloanEligibility_withSalary'),
     path('check_NormalloanEligibility_withSalary/<str:salary>/', views.check_NormalloanEligibility_withSalary, name='check_NormalloanEligibility_withSalary'),
      
-    path('Submit-Share-Adjustment', views.Submit_Share_Adjustment, name ='Submit_Share_Adjustment'),
+   
     path('filter_schedules/', views.filter_schedules, name='filter_schedules'),
+
+    # share adjustment
+    path('checkPinForShareAdjustment', views.checkPinForShareAdjustment, name='checkPinForShareAdjustment'),
+    path('Submit-Share-Adjustment', views.Submit_Share_Adjustment, name ='Submit-Share-Adjustment'),
 
     # share transfer
     path('checkPinForShareTransfer', views.checkPinForShareTransfer, name='checkPinForShareTransfer'),

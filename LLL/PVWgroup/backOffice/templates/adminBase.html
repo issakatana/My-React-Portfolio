@@ -1,3 +1,5 @@
+{% if user.is_authenticated and user.is_superuser %}
+
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
@@ -7,7 +9,7 @@
     <meta name="theme-color" content="#000000" />
     <title>PV-Welfare Group</title>
     <!-- css link  -->
-    <link rel="stylesheet" href="{% static 'styles/jsx1.css' %}">
+    <link rel="stylesheet" href="{% static 'styles/jsx5.css' %}">
     <!-- high quality Boxicons from boxicons.com -->
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <!-- font awesome icons -->
@@ -223,7 +225,7 @@
                 } 
             });
         </script>
-        <script src="../../static/js/back9.js"></script>     
+        <script src="../../static/js/back21.js"></script>     
         <script>
             document.addEventListener("DOMContentLoaded", function () {
                 const mobileMenuIcon = document.querySelector('.left-mobile');
@@ -257,3 +259,17 @@
         </style>
 </body>
 </html>
+
+{% else %}
+
+    <!-- Redirect to login or display an unauthorized message -->
+    {% if not user.is_authenticated %}
+        {% url 'login' as login_url %}
+        <script>
+            window.location.href = "{% url 'login' %}?next={{ request.path }}";
+        </script>
+    {% else %}
+        <p>You do not have permission to access this page.</p>
+    {% endif %}
+
+{% endif %}

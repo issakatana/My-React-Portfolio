@@ -5,26 +5,886 @@
 
 
 <section class="accounts-section" id="accountsSection">
-    <article class="myLoans memberPortal-loans" id="myLoansArticle">
-        <h1>My Loans</h1>
-    </article>
 
-    <article class="loanApplication memberPortal-loans" id="loanApplicationArticle">
-        <h1>Loan Application</h1>
-    </article>
+  <!-- Section Running loans start -->
+  <article class="myLoans memberPortal-loans" id="myLoansArticle">
+      
+    <!-- loan summary -->
+    <div class="centered">
+        
+      <div class="runningLoansWrapper">
+        {% if runningAdvanceLoans or runningWelfareLoans  %}
+
+        {% if runningAdvanceLoans %}
+        <!-- advance loan table -->
+        <table class="tbl">
+          <thead>
+              <tr>
+                  <th>Date Borrowed</th>
+                  <th>Loan Id</th>
+                  <th>Borrowed Loan Amount</th>
+                  <th>Interest Rate</th>
+                  <th>Interest</th>
+                  <th>Amount to be paid</th>
+                  <th>Maturity Date</th>
+                  <th>Status</th>
+                  <th>Action</th>
+              </tr>
+          </thead>
+          <tbody>
+            {% for loan in runningAdvanceLoans %}
+            <tr>
+              <td>{{ loan.date_requested }}</td>
+              <td>{{ loan.loan_id }}</td>
+              <td>{{ loan.borrowed_amount }}</td>
+              <td> 5% </td>
+              <td>{{ loan.interest }}</td>
+              <td>{{ loan.amount_to_be_paid }}</td>
+              <td>{{ loan.maturity_date }}</td>
+
+              <td>
+                {% if loan.status == 'pending' %}
+                  <span style="color: darkred;font-weight:bold;"> In Review</span>
+                {% elif loan.status == 'approved' %}
+                  <span style="color: green;font-weight:bold;">Running</span>
+                {% else %}
+                    {{ loan.status }}
+                {% endif %}
+              </td>
+
+              <td>
+                {% if loan.status == 'pending' %}
+                  <a href="#">None</a>
+                {% else %}
+                  <a href="#">Repay Now</a>
+                {% endif %}
+              </td>
+
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+
+     
+      {% if runningWelfareLoans  %}
+      <!-- Welfare loan table -->
+      <table class="tbl">
+        <thead>
+            <tr>
+                <th>Date Borrowed</th>
+                <th>Loan Id</th>
+                <th>Borrowed Amount</th>
+                <th>Interest Rate</th>
+                <th>Interest</th>
+                <th>Amount to be paid</th>
+                <th>Maturity Date</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for normalLoan in runningWelfareLoans %}
+                <tr>
+                    <td>{{ normalLoan.date_requested }}</td>
+                    <td>{{ normalLoan.loan_id }}</td>
+                    <td>{{ normalLoan.borrowed_amount }}</td>
+                    <td> 5% </td>
+                    <td>{{ normalLoan.total_loan_interest }}</td>
+                    <td>{{ normalLoan.loan_amount_to_be_paid }}</td>
+                    <td>{{ normalLoan.loan_maturity_date }}</td>
+                    <td>
+                        {% if normalLoan.status == 'pending' %}
+                            <span style="color: darkred;font-weight:bold;"> In Review</span>
+                        {% elif normalLoan.status == 'approved' %}
+                            <span style="color: green;font-weight:bold;">Running</span>
+                        {% else %}
+                            {{ normalLoan.status }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if normalLoan.status == 'pending' %}
+                            None
+                        {% else %}
+                            <a href="#">Repay Now</a>
+                        {% endif %}
+                    </td>
+                </tr>
+
+                <!-- Separate table for reducing table entries -->
+                <tr>
+                    <td colspan="9">
+                        <table id="reducingTable" class="reducing-table tbl">
+                            <thead style="background: rgb(132, 78, 132)" >
+                                <tr>
+                                    <th>Principal</th>
+                                    <th>Interest Rate</th>
+                                    <th>Interest</th>
+                                    <th>Installment</th>
+                                    <th>Amount Due</th>
+                                    <th>Maturity Date</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in normalLoan.reducing_table.all %}
+                                    <tr>
+                                        <td>{{ entry.total_amount_formatted }}</td>
+                                        <td> 5% </td>
+                                        <td>{{ entry.interest }}</td>
+                                        <td>{{ entry.installment }}</td>
+                                        <td>{{ entry.amount_due }}</td>
+                                        <td>{{ entry.installment_maturity_date }}</td>
+                                        <td>{{ entry.status }}</td>
+                                        <td>
+                                            {% if entry.status == 'notpaid' %}
+                                                None
+                                            {% else %}
+                                                <a href="#">Repay</a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      {% else %}
+        <tr>
+          <td colspan="10">You don't have any active running loan at the moment</td>
+          <a href="{% url 'loans' %}?loans=loanApplicationArticle" class="dd">
+            <i class="fa-solid fa-link"></i> Apply now...
+          </a>
+        </tr>
+      {% endif %} 
+  
+      </div>
+
+    </div>
+
+  </article>
+  <!-- Section Running loans end -->
+
+
+  <!-- Loan Application Start -->
+  <article class="loanApplication memberPortal-loans" id="loanApplicationArticle">
+
+    <!-- claim wrapper -->
+    <div class="centered">
+
+      <div class="my-member-tittle profile-tittle loan-title">
+        <p id="dynamic-section-head">Loan Application Form (Applicant's Details):</p>
+        <p id="dynamic-section-step-count">Step 1 of 4</p>
+      </div>
+
+      <!-- form start -->
+      <form action="#" method="post" class="loanApplicationFormData loanApplicationWrapper" id="loanApplicationFormData">
+
+        {% csrf_token %}
+          
+        <!-- Member Details -->
+        <div class="memberDetails form-step form-step-active">
+
+          <div class="applicants-details-contents">
+
+            <div class="form-group">
+              <label for="full_name">Full Name:</label>
+              <input type="text" name="full_name" id="full_name_la" class="full_name" value="{{ full_name }}" readonly required>
+            </div>
+
+            <div class="form-group">
+              <label for="id_number">Member Number:</label>
+              <input type="text" name="id_number" id="id_number_number" class="id_number" value="{{  id_number_number }}" readonly required>
+            </div>
+
+            <div class="form-group">
+                <label for="id_number">ID Number:</label>
+                <input type="number" name="id_number" id="id_number_la" class="id_number" value="{{ member_idno }}" readonly required>
+            </div>
+
+            <div class="form-group">
+                <label for="phone_number">Phone Number:</label>
+                <input type="tel" name="phone_number" id="phone_number_la" class="phone_number" value="{{ phone_number }}" readonly required>
+            </div>
+
+            <div class="form-group">
+                <label for="position">Position:</label>
+                <input type="text" name="position" id="position_la" class="position" value="{{ member_position }}" readonly required>
+            </div>
+
+            <div class="form-group">
+                <label for="residence">Residence:</label>
+                <input type="text" name="residence" id="residence_la" class="residence" value="{{ residence }}" readonly required>
+            </div>
+
+            <!-- <div class="input-group">
+              <label for="supportDocuments">Attach Support Documents</label>
+              <input type="file" name="supportDocuments" id="supportDocuments_la" accept=".pdf, .doc, .docx" multiple>
+              <small>Accepted file types: PDF, DOC, DOCX</small>
+            </div> -->
+
+          </div>
+
+          <div class="btns-group loans-button">
+            <a href="#" id="passdisabled" class="btn-loans btn-next">Save and Continue</a>
+          </div>
+
+        </div>
+        
+
+        <!-- loan type and calculation -->
+        <div class="loanDetails loan-type form-step">
+
+          <div class="loan-type-contents">
+
+            <div class="input-group">
+              <label class="loan-check-notification">Check the loan you are applying for<sup>*</sup></label>
+              <div class="group-block">
+                <div class="input-group">
+                  <label for="advanceloan">Advanced Loan</label>
+                  <input type="checkbox" name="advanceLoan" value="signed" id="advanceLoan" class="loan-checkbox" onclick="uncheckOther(this)">
+                </div>
+                <div class="input-group">
+                    <label for="normalloan">Normal Loan</label>
+                    <input type="checkbox" name="normalLoan" value="signed" id="normalLoan" class="loan-checkbox" onclick="uncheckOther(this)">
+                </div>
+              </div>
+
+            </div>   
+
+            <div class="input-group">
+              <label for="amount">Amount Applied For<sup>*</sup></label>
+              <input type="number" name="amount" id="amount">
+              <div id="amount-error" class="input-error-div"></div>
+              <span id="salaryCheckError" class="amountAppliedForError"></span> 
+              <span id="amountAppliedForError" class="amountAppliedForError"></span>   
+            </div>
+          
+
+            <div class="input-group showIfNormalLoan">
+              <label for="repaymentPeriod">Repayment Period (In Months)<sup>*</sup></label>
+              <select name="repaymentPeriod" id="repaymentPeriod">
+                <option value="">Select repayment period...</option>
+                <option value="1">1 month</option>
+                <option value="2">2 months</option>
+                <option value="3">3 months</option>
+                <option value="4">4 months</option>
+                <option value="5">5 months</option>
+                <option value="6">6 months</option>
+                <option value="7">7 months</option>
+                <option value="8">8 months</option>
+                <option value="9">9 months</option>
+                <option value="10">10 months</option>
+                <option value="11">11 months</option>
+                <option value="12">12 months</option>
+                <option value="13">13 months</option>
+                <option value="14">14 months</option>
+                <option value="15">15 months</option>
+                <option value="16">16 months</option>
+                <option value="17">17 months</option>
+                <option value="18">18 months</option>
+                <option value="19">19 months</option>
+                <option value="20">20 months</option>
+                <option value="21">21 months</option>
+                <option value="22">22 months</option>
+                <option value="23">23 months</option>
+                <option value="24">24 months</option>
+                <option value="25">25 months</option>
+                <option value="26">26 months</option>
+                <option value="27">27 months</option>
+                <option value="28">28 months</option>
+                <option value="29">29 months</option>
+                <option value="30">30 months</option>
+                <option value="31">31 months</option>
+                <option value="32">32 months</option>
+                <option value="33">33 months</option>
+                <option value="34">34 months</option>
+                <option value="35">35 months</option>
+                <option value="36">36 months</option>
+                <option value="37">37 months</option>
+                <option value="38">38 months</option>
+                <option value="39">39 months</option>
+                <option value="40">40 months</option>
+                <option value="41">41 months</option>
+                <option value="42">42 months</option>
+                <option value="43">43 months</option>
+                <option value="44">44 months</option>
+                <option value="45">45 months</option>
+                <option value="46">46 months</option>
+                <option value="47">47 months</option>
+                <option value="48">48 months</option>
+              </select>
+              <div id="repaymentPeriod-error" class="input-error-div"></div>
+            </div>                
+
+            <div class="input-group showIfNormalLoan">
+              <label for="monthlyInstallment">Monthly Installment<sup>*</sup></label>
+              <input type="number" name="monthlyInstallment" id="monthlyInstallment" readonly required>
+            </div>
+
+            <div class="input-group">
+              <label for="loanPurpose">Loan Purpose<sup>*</sup></label>
+              <textarea name="loanPurpose" id="loanPurpose" rows="4" cols="30" aria-describedby="loanPurpose-error"></textarea>
+              <div id="loanPurpose-error" class="input-error-div"></div>
+            </div>
+
+            <div class="loanCalculater">
+              <span id="pvwLoanCalculator"><i class="fa fa-calculator" aria-hidden="true"></i> Loan Calculator</span>
+              <div id="calculatorError" class="calculatorError"></div>
+
+             
+<!--             
+              <div class="overlay" id="overlay">
+                <div class="popup">
+                    <div class="closebtn">
+                        <a href="#" id="popupCloseButton"><i class="fa fa-times" aria-hidden="true"></i></a>
+                        <a href="#"><i class="fa fa-question" aria-hidden="true"></i></a>
+                    </div>
+                    <div id="popupContent">
+                      <div id="salaryAdvanceDivTableResults"></div>
+                    </div>
+                    <button id="popupPrevButton" style="display: none;">Back</button>
+                    <button id="popupNextButton">Next</button>
+                    <button id="popupRejectButtonAcc" class="popupRejectButtonAcc" style="display: none;">
+                        <a href='#' id="rejectLinkAcc" class="rejectLink" data-rejectAccountCreatedLoan-url="{% url 'reject_accountCreated_request' member_id=1 %}">Reject</a>
+                    </button>
+                    <button id="popupApproveButton" style="display: none;">
+                        <a href='#' id="approveLink" class="approveLink" data-url="{% url 'approve_member' member_id=1 %}">Approve</a>
+                    </button>               
+                </div>
+            </div> -->
+
+
+               
+
+              <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                  document.getElementById("pvwLoanCalculator").addEventListener("click", function (event) {
+                    event.preventDefault();
+                
+                    // Check if either Advance Loan or Normal Loan is selected
+                    const advanceLoanCheckbox = document.getElementById('advanceLoan');
+                    const normalLoanCheckbox = document.getElementById('normalLoan');
+
+                    const amountInput = document.getElementById('amount');
+                    const repaymentPeriodSelect = document.getElementById('repaymentPeriod');
+                    const monthlyInstallmenSelect = document.getElementById('monthlyInstallment');
+
+                    const resultDiv = document.getElementById('salaryAdvanceDivTableResults');
+                
+                    if (!advanceLoanCheckbox.checked && !normalLoanCheckbox.checked) {
+
+                      // Display an error message
+                      const errorDiv = document.getElementById('calculatorError');
+                      errorDiv.textContent = 'Please select either Advance Loan or Normal Loan.';
+                      resultDiv.innerHTML = "";
+                      return; 
+
+                    } else {
+
+                      // Clear any previous error messages
+                      const errorDiv = document.getElementById('calculatorError');
+                      errorDiv.textContent = '';
+                
+                      // Log which checkbox is checked
+                      if (advanceLoanCheckbox.checked) { 
+                        document.getElementById('salaryAdvanceDivTableResults').style.display = "block";
+                        calculateSalaryAdvanceSchedule();
+                      } else {
+                        document.getElementById('salaryAdvanceDivTableResults').style.display = "none";
+                      }
+                
+                      if (normalLoanCheckbox.checked) {
+                        document.getElementById('welfareLoanDivTableResults').style.display = "block";
+                        calculateWelfareLoanSchedule();
+                      } else {
+                        document.getElementById('welfareLoanDivTableResults').style.display = "none";
+                      }
+
+                    }
+
+                    // Add event listeners
+                    amountInput.addEventListener('input', calculateSalaryAdvanceSchedule);
+                    repaymentPeriodSelect.addEventListener('input', calculateWelfareLoanSchedule);
+                    
+                    function calculateSalaryAdvanceSchedule() {
+
+                      const interestRate = 0.05; 
+                      const amount = parseFloat(amountInput.value.trim()) || 0;
+                      const interest = amount * interestRate;
+                      const amountToBePaid = amount + interest;
+                      const currentDate = new Date();
+                      const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+                      const formattedMaturityDate = formatDate(lastDayOfMonth);
+                
+                      resultDiv.innerHTML = `
+                        <table class="tbl">
+                          <thead>
+                            <tr>
+                              <th>Principal Amount</th>
+                              <th>Interest Rate</th>
+                              <th>Interest</th>
+                              <th>Amount Repayable</th>
+                              <th>Maturity Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td>${amount}</td>
+                              <td>5%</td>
+                              <td>${interest}</td>
+                              <td>${amountToBePaid}</td>
+                              <td>${formattedMaturityDate}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      `;
+
+                    }
+                
+                    function calculateWelfareLoanSchedule() {
+                      const interestRate = 0.05; // Replace with your actual interest rate
+                      const amount = parseFloat(document.getElementById('amount').value.trim()) || 0;
+                      const durationMonths = parseInt(document.getElementById('repaymentPeriod').value, 10) || 0;
+                    
+                      const monthlyInstallment = amount / durationMonths;
+                      let outstandingLoanPrincipal = amount;
+                      const currentDate = new Date();
+                    
+                      const resultDiv = document.getElementById('welfareLoanDivTableResults');
+                      let tableHtml = `
+                        <table class="tbl">
+                          <thead>
+                            <tr>
+                              <th>Month</th>
+                              <th>Principal Amount</th>
+                              <th>Interest Rate</th>
+                              <th>Interest</th>
+                              <th>Amount Due</th>
+                              <th>Outstanding Principal</th>
+                              <th>Installment Maturity Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                      `;
+                    
+                      for (let month = 1; month <= durationMonths; month++) {
+                        const interest = outstandingLoanPrincipal * interestRate;
+                        const amountDue = monthlyInstallment + interest;
+                        outstandingLoanPrincipal -= monthlyInstallment;
+                    
+                        const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+                        const installmentMaturityDate = formatDate(lastDayOfMonth);
+                    
+                        tableHtml += `
+                          <tr>
+                            <td>${month}</td>
+                            <td>${monthlyInstallment.toFixed(2)}</td>
+                            <td>${(interestRate * 100).toFixed(2)}%</td>
+                            <td>${interest.toFixed(2)}</td>
+                            <td>${amountDue.toFixed(2)}</td>
+                            <td>${outstandingLoanPrincipal.toFixed(2)}</td>
+                            <td>${installmentMaturityDate}</td>
+                          </tr>
+                        `;
+                    
+                        currentDate.setMonth(currentDate.getMonth() + 1);
+                      }
+                    
+                      tableHtml += `
+                          </tbody>
+                        </table>
+                      `;
+                      resultDiv.innerHTML = tableHtml;
+                    }
+                    
+                 
+                    
+
+                    function formatDate(date) {
+                      // Implement the logic to format the date as needed (e.g., in the format YYYY-MM-DD)
+                      const year = date.getFullYear();
+                      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                      const day = date.getDate().toString().padStart(2, '0');
+                      return `${year}-${month}-${day}`;
+                    }
+
+                  });
+
+                });
+                
+                // Function to uncheck the other checkbox when one is checked
+                function uncheckOther(checkbox) {
+
+                  const checkboxes = document.querySelectorAll('.loan-checkbox');
+                  checkboxes.forEach(function (cb) {
+                    if (cb !== checkbox) {
+                      cb.checked = false;
+                    }
+                  });
+
+                }
+                
+              </script>
+              
+            </div>
+         
+          </div>
+
+          <div id="salaryAdvanceDivTableResults" class="flex-buttons"></div>
+          <div id="welfareLoanDivTableResults" class="flex-buttons"></div>
+          
+          <div class="flex-buttons">
+
+            <div class="btns-group loans-button loans-button-prev">
+              <a href="#" class="btn btn-prev">Back</a>
+            </div>
+
+            <div class="btns-group loans-button">
+              <a href="#" class="btn btn-next" id="mailphone">Save and Continue</a>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- guarantors -->
+        <div class="loanGuarantors guarantors  form-step">
+          <p class="loantt">Guarantors</p>
+          <div class="guarantors-list">
+              <p>In consideration of the Welfare granting the whole of the above loan or any lesser amount that may be
+                  approved, we the undersigned hereby accept jointly and severally, liability for its repayment in the event
+                  of the borrower’s default. We understand that the amount in default may be offset against our deposits in
+                  the Welfare</p>
+              <div id="loan-guarantors" class="tbl_container">
+                  <table id="guarantersTable" class="tbl" >
+                      <thead>
+                          <tr>
+                              <th>Id</th>
+                              <th>Guarantor's Name</th>
+                              <th>Guarantor's Member Number</th>
+                              <th>ID Number</th>
+                              <th>Telephone</th>
+                              <th>Signature</th>
+                              <th colspan="2">Actions</th> 
+                          </tr>
+                      </thead>
+                      <tbody id="loanGuarantorsList">
+                          
+                      </tbody>
+                  </table>
+                  <!-- In the head of your HTML document or in an external stylesheet -->
+                  <div id="guarantorsList-array-error" class="input-error-div"></div>
+                  <div id="guarantors-duplicate-array-error" class="input-error-div"></div>
+                  <div class="memberno-guarantor-form-input">
+                      <div class="input_group">
+                          <label for="nameofguarantor"></label>
+                          <input type="text" id="guarantorMemberNumber" name="nameofguarantor" placeholder="Member Number of Guarantor">
+                          <div id="nameofguarantor-error" class="input-error-div"></div>
+                      </div>
+                  </div>
+                  <span id="addGuarantor" class="guarantor-btn">Add Guarantor</span>
+              </div>    
+            </div>  
+
+            <div class="flex-buttons">
+
+              <div class="btns-group loans-button loans-button-prev">
+                <a href="#" class="btn btn-prev">Back</a>
+              </div>
+
+              <div class="btns-group loans-button">
+                <a href="#" class="btn btn-next" id="mailphone">Save and Continue</a>
+              </div>
+
+            </div>
+
+      </div>
+
+      <!-- member declaration -->
+      <div class="member-declaration  form-step">
+        <p class="loantt">Declaration</p>
+        <div class="declaration">
+            <p>I hereby declare that the foregoing particulars are true to the best of my knowledge and belief and agree to
+                abide by the bylaws of the Welfare, Credit policy and any variations by the Loan Committee in respect of
+                Loan details above.</p>
+            <p>
+                <label>
+                    <input type="checkbox" name="loan_agreement" value="accepted">
+                    By checking this box, I hereby commit to service the loan according to the terms.
+                </label>
+            </p>
+        </div>
+
+        <div class="flex-buttons">
+
+          <div class="btns-group loans-button loans-button-prev">
+            <a href="#" class="btn btn-prev">Back</a>
+          </div>
+
+          <div class="btns-group loans-button">
+            <input type="submit" name="loanApplicationButton" id="loanApplicationSubmitButton" class="loanApplicationButtonInput" value="Submit Application">
+          </div>
+
+        </div>
+
+      </div>
+
+    </form>
+
+    </div>
+
+  </article>
+  <!-- Loan Application End -->
+
+
 
     <article class="loanRepayment memberPortal-loans" id="loanRepaymentArticle">
+         <div class="centered">
         <h1>Loan Repayment</h1>
+          <p>This view is likely being updated on the server.</p>
+            <p>It will display as soon as the updates completes.</p>
+            <p>You can continue working with other tabs or try accessing other views/folders.</p>
+                    </div>
     </article>
 
     <article class="guaranteedLoans memberPortal-loans" id="guaranteedLoansArticle">
-        <h1>Guaranteed Loans</h1>
+        <div class="centered">
+
+           {% for code in verification_codes %}
+              {% if code.receiver_member.user.username == request.user.username %}
+                    <!-- Active Loan Verification Codes -->
+                    <div class="guaranteed-list">
+                        <strong class="profile-tittle">Active Loan Verification Codes :</strong>
+            
+                        <table class="tbl">
+                            <thead>
+                                <tr>
+                                    <th>Created at</th>
+                                    <th>Code Purpose</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody id="verificationCodeTableBody">
+                                <tr>
+                                    <td>{{ code.created_at }}</td>
+                                    <td>{{ code.code_purpose }}</td>
+                                    <td>
+                                        <p>
+                                            Dear <strong>{{ code.receiver_member.user.username }} </strong>,
+                                            <strong>{{ code.sender_member.personal_details.get_full_name }}</strong> has nominated you as a guarantor for a Loan.
+                                            By sharing this code 
+                                            <strong id="verificationCodeElement" data-code-id="{{ code.id }}">{{ code.code }}</strong>,
+                                            you consent to providing and processing of your personal data and agree to the terms & conditions as listed at Parkside Villa Welfare Group.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            {% endfor %}
+      
+            <!-- My Guarantors List -->
+            <div class="guarantors-list">
+              <strong class="profile-tittle">My Loan Guarantors :</strong>
+              <table class="tbl">
+                  <thead>
+                      <tr>
+                          <th>Loan ID</th>
+                          <th>Loan Maturity Date</th>
+                          <th>Guarantors</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {% if combined_data|length == 0 %}
+                          <tr>
+                              <td colspan="3">No records found. You do not have any running loans or loans under review.</td>
+                          </tr>
+                      {% else %}
+                          {% for loan in combined_data %}
+                              <tr>
+                                  <td>{{ loan.loan_id }}</td>
+                                  <td>{{ loan.maturity_date }}</td>
+                                  <td>
+                                      {% if loan.get_guarantors %}
+                                          <!-- Table for Guarantors -->
+                                          <table class="guarantor-table">
+                                              <thead>
+                                                  <tr>
+                                                      <th>Member Number</th>
+                                                      <th>Full Name</th>
+                                                      <th>Phone Number</th>
+                                                      <th>Signature Status</th>
+                                                  </tr>
+                                              </thead>
+                                              <tbody>
+                                                  {% for guarantor in loan.get_guarantors %}
+                                                      <tr>
+                                                          <td>{{ guarantor.member_number }}</td>
+                                                          <td>{{ guarantor.full_name }}</td>
+                                                          <td>{{ guarantor.phone_number }}</td>
+                                                          <td>{{ guarantor.signature_status }}</td>
+                                                      </tr>
+                                                  {% endfor %}
+                                              </tbody>
+                                          </table>
+                                      {% else %}
+                                          No guarantors found for this loan.
+                                      {% endif %}
+                                  </td>
+                              </tr>
+                          {% endfor %}
+                      {% endif %}
+                  </tbody>
+              </table>
+            </div>
+
+          <!-- Loans that I have guaranteed -->
+          <div class="guaranteed-list">
+            <strong class="profile-tittle">Loans that I have guaranteed :</strong>
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Loan ID</th>
+                        <th>Loan Type</th>
+                        <th>Loan Amount</th>
+                        <th>Maturity Date</th>
+                        <th>Loan Status</th>
+                        <th>Borrower Full Name</th>
+                        <th>Borrower Member Number</th>
+                    </tr>
+                </thead>
+                <tbody>
+                  {% if user_guarantors|length == 0 %}
+                  <tr>
+                      <td colspan="7">No records found. You have not guaranteed any loan at the moment.</td>
+                  </tr>
+              {% else %}
+
+                    {% for guarantor in user_guarantors %}
+                        {% if guarantor.guaranteed_repaid == False %}
+                            {% if guarantor.advance_loan %}
+                                <tr>
+                                    <td>{{ guarantor.advance_loan.loan_id }}</td>
+                                    <td>Advance Loan</td>
+                                    <td>{{ guarantor.advance_loan.borrowed_amount }}</td>
+                                    <td>{{ guarantor.advance_loan.maturity_date }}</td>
+                                    <td>
+                                      {% if guarantor.advance_loan.status == 'pending' %}
+                                          <span style="color: darkred;font-weight:bold;"> In Review</span>
+                                      {% elif guarantor.advance_loan.status == 'approved' %}
+                                          <span style="color: green;font-weight:bold;">Active</span>
+                                      {% else %}
+                                          {{ guarantor.advance_loan.status }}
+                                      {% endif %}
+                                    </td>
+                                    <td>{{ guarantor.advance_loan.member.personal_details.get_full_name }}</td>
+                                    <td>{{ guarantor.advance_loan.member.user.member_number }}</td>
+                                </tr>
+                            {% elif guarantor.welfare_loan %}
+                                <tr>
+                                    <td>{{ guarantor.welfare_loan.loan_id }}</td>
+                                    <td>Welfare Loan</td>
+                                    <td>{{ guarantor.welfare_loan.borrowed_amount }}</td>
+                                    <td>{{ guarantor.welfare_loan.loan_maturity_date }}</td>
+                                    <td>
+                                      {% if guarantor.welfare_loan.status == 'pending' %}
+                                          <span style="color: darkred;font-weight:bold;"> In Review</span>
+                                      {% elif guarantor.welfare_loan.status == 'approved' %}
+                                          <span style="color: green;font-weight:bold;">Active</span>
+                                      {% else %}
+                                          {{ guarantor.welfare_loan.status }}
+                                      {% endif %}
+                                    </td>
+                                    <td>{{ guarantor.welfare_loan.member.personal_details.get_full_name }}</td>
+                                    <td>{{ guarantor.welfare_loan.member.user.member_number }}</td>
+                                </tr>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        
+      </div>
+       
     </article>
 
+
     <article class="guarantorEligibility memberPortal-loans" id="guarantorEligibilityArticle">
+         <div class="centered">
         <h1>Guarantor Eligibility</h1>
+          <p>This view is likely being updated on the server.</p>
+            <p>It will display as soon as the updates completes.</p>
+            <p>You can continue working with other tabs or try accessing other views/folders.</p>
+                    </div>
     </article>
+
 </section>
+
+
+
+
+
+
+
+<style>
+  .form-step {
+    display: none;
+    transform-origin: top;
+    animation: animate .5s;
+  }
+  .form-step-active {
+      display: block;
+      width: 100%;
+  }
+</style>
+
+<!-- <style>
+  .loanNextWrapper {
+    display: none;
+  }
+  .loanNextWrapper.active {
+    display: grid;
+  }
+</style> -->
+<!-- <style>
+  .btn-next,
+  .btn-prev {
+    display: none;
+  }
+</style> -->
+
+
+<style>
+  .delete-button {
+      background-color: red;
+      padding: 1vw;
+      border: none;
+      color: white;
+      cursor: pointer;
+  }
+  
+  .delete-button:hover {
+      background-color: darkred;
+  }
+  
+  .pending-acceptance {
+      color: #8B0000; 
+      font-weight: bold;
+      font-size: 1.2rem;
+  }
+</style>
 
 
 <style>
@@ -38,6 +898,56 @@
         background-color: #ddd; 
     }
 </style>
+
+
+<style>
+  .runningLoansWrapper {
+    padding: 2vw;
+  }
+  .loanCalculater {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-flow: row wrap;
+  }
+  .loanCalculater span {
+    padding: 10px 20px;
+    background: purple;
+    color: whitesmoke;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    flex-flow: row wrap;
+  }
+  .fa-calculator {
+    color: green;
+    font-weight: bold;
+    font-size: 1.5rem;
+  }
+  .calculatorError {
+    color: darkred;
+    font-size: .8rem;
+  }
+  .guarantor-acceptance {
+    padding: 5px 10px;
+    background: green;
+    border-radius: 5px;
+    margin-top: 2rem;
+  }
+  .pending-acceptance p {
+    margin-bottom: 10px;
+  }
+  .guarantor-accepted {
+    font-size: 1rem;
+    font-weight: bold;
+    color: green;
+  }
+</style>
+
+
+
 
 
 {% endblock %}

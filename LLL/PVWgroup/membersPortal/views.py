@@ -6,9 +6,9 @@ import json
 import pytz
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponseServerError
-from django.http import JsonResponse
 from django.utils import timezone
 from authentication.models import CustomUser, Member, PersonalDetails, ContactDetails, Nominee, NextOfKin
+from membersPortal.models import MailSmsVerificationCode
 from backOffice.models import Transaction, Benovelent, AdjustedShareContributions, AdvanceLoan, WelfareLoan, ReducingTable, Guarantor, DeceasedInformation, BenevolentClaim
 from django.contrib import messages
 from datetime import timedelta
@@ -17,7 +17,11 @@ from django.db import transaction
 from django.views.decorators.http import require_GET
 from django.contrib.auth.hashers import check_password
 from django.core.exceptions import ObjectDoesNotExist
-
+import decimal 
+from django.views.decorators.http import require_POST
+from django.db.models import Q
+import random
+from django.core.mail import send_mail
 # from rest_framework.decorators import api_view
 # from rest_framework.response import Response
 # from rest_framework import status
@@ -32,7 +36,7 @@ from django.core.exceptions import ObjectDoesNotExist
 #     except Member.DoesNotExist:
 #         return Response("Member not found", status=status.HTTP_404_NOT_FOUND)
     
-from django.http import JsonResponse
+
 from django.views.decorators.http import require_GET
 
 @require_GET
@@ -104,6 +108,7 @@ def dashboard(request):
 
         salary_advance_loan = member_instance.salary_advance_loan
         normal_loan = member_instance.normal_loan
+        
         salary_advance_loan_interest = member_instance.salary_advance_loan_interest
         normal_loan_interest = member_instance.normal_loan_interest
 
@@ -199,7 +204,7 @@ def accounts(request):
         ).exclude(activity_type__in=['benovelent', 'share adjustment', 'contribution approved', 'loan rejection', 'loan submitted'])
 
         # Calculate balances
-        # share_amount = member_instance.share_amount.share_amount
+        share_amount = member_instance.share_amount.share_amount
         shares_balance = member_instance.shares_contribution
 
         salary_advance_loan = member_instance.salary_advance_loan
@@ -234,7 +239,7 @@ def accounts(request):
             'phone_number':phone_number,
 
             'current_user': request.user,
-            # 'share_amount': share_amount,
+            'share_amount': share_amount,
             'shares_balance': shares_balance,
             'salary_advance_loan': salary_advance_loan,
             'normal_loan': normal_loan,
@@ -256,7 +261,7 @@ def accounts(request):
 
 
 
-################# LOAN PAGE VIEWS #################
+################# LOAN PAGE AND PROCESSES VIEWS START #################
 @login_required
 def loans(request):
     try:
@@ -266,8 +271,9 @@ def loans(request):
         contact_details = member_instance.contact_details
 
         full_name = f"{personal_details.fname} {personal_details.onames}"
-        member_position =  personal_details.position
-        member_idno =  personal_details.idnumber
+        id_number_number = request.user.member_number
+        member_position = personal_details.position
+        member_idno = personal_details.idnumber
         phone_number = contact_details.phoneno
         residence = contact_details.sublocation
 
@@ -284,48 +290,82 @@ def loans(request):
         current_path = request.path
         page_name = current_path.split('/')[-1]
         page_title_map = {
-        'loans': 'My Loans',
+            'loans': 'My Loans',
         }
         page_title = page_title_map.get(page_name, 'My Loans')
 
-
+        # Fetch guarantor information for the user
+        user_guarantors = Guarantor.objects.filter(
+            member_number=current_user,
+            guaranteed_repaid=False,
+            # signature_status__in=['Pending', 'Accepted', 'Rejected']
+            )
+        
+        # Fetch the latest verification codes for the receiver user where is_picked is False and is_expired is False
+        verification_codes = MailSmsVerificationCode.objects.filter(
+            is_picked=False,
+            expired=False
+        )
+    
+        # Print the verification codes for debugging
+        print("Fetched Verification Codes:")
+        for code in verification_codes:
+            print(f"Picked: {code.is_picked}, Expired: {code.expired}, Code: {code.code}, Purpose: {code.code_purpose}, Sender Member: {code.sender_member}, Receiver Member: {code.receiver_member}")
 
         # Fetch advance Loan for the user
         advanceloans = AdvanceLoan.objects.filter(
-            member=member_instance, is_repaid = False,   is_disbursed = True
+            member=member_instance, is_repaid=False, is_disbursed=True
         )
 
-        # Fetch advance Loan for the user
+        # Fetch welfare Loan for the user
         welfareloans = WelfareLoan.objects.filter(
-            member=member_instance, is_repaid = False,   is_disbursed = True, status = 'approved'
+            member=member_instance, is_repaid=False, is_disbursed=True, status='approved'
         )
-
-        # Fetch reducing table entries for welfare loans
+        
         reducing_tabless = ReducingTable.objects.filter(
             welfare_loan__in=welfareloans,
-            status__in=['granted', 'picked'],
+            status__in=['granted', 'picked']
         )
-
 
         # Combine transactions and reducing_tabless data
         combined_data = list(advanceloans) + list(welfareloans)
         # Sort the combined data by posting_date
         combined_data.sort(key=lambda x: x.posting_date, reverse=True)
 
+        # Fetch advance Loan for the user
+        runningAdvanceLoans = AdvanceLoan.objects.filter(
+            member=member_instance,
+            is_repaid=False,
+            amount_to_be_paid__gt=0,
+            status__in=['pending', 'approved']
+        )
+
+        # Fetch Welfare Loans where is_repaid is False and amount_to_be_paid is greater than zero
+        runningWelfareLoans = WelfareLoan.objects.filter(
+            member=member_instance,
+            is_repaid=False,
+            loan_amount_to_be_paid__gt=0,
+            status__in=['pending', 'approved']
+        )
 
         context = {
             'page_title': page_title,
             'current_user': current_user,
             'last_login': last_login_nairobi,
             'full_name': full_name,
-            'member_position':member_position,
-            'member_idno' :  member_idno,
-            'phone_number' :phone_number,
-            'residence' : residence,
-            'advanceloans' : advanceloans,
-            'welfareloans' : welfareloans,
-            'reducing_tabless' : reducing_tabless,
+            'id_number_number': id_number_number,
+            'member_position': member_position,
+            'member_idno': member_idno,
+            'phone_number': phone_number,
+            'residence': residence,
+            'advanceloans': advanceloans,
+            'welfareloans': welfareloans,
+            'reducing_tabless': reducing_tabless,
             'combined_data': combined_data,
+            'runningAdvanceLoans': runningAdvanceLoans,
+            'runningWelfareLoans': runningWelfareLoans,
+            'user_guarantors': user_guarantors, 
+            'verification_codes':verification_codes
         }
         return render(request, 'loans.html', context)
     except Member.DoesNotExist:
@@ -335,27 +375,36 @@ def loans(request):
 
 
 
-# @login_required
-# def get_guarantor_info(request, member_number):
-#     try:
-#         user = get_object_or_404(CustomUser, member_number=member_number)
-#         personal_details = PersonalDetails.objects.get(member__user=user)
-#         contact_details = ContactDetails.objects.get(member__user=user)
-     
-#         response_data = {
-#             'member_number': user.member_number,
-#             'full_name': f"{personal_details.surname} {personal_details.fname} {personal_details.onames}",
-#             'id_number': personal_details.idnumber,
-#             'phone_number': contact_details.phoneno,
-#         }
 
-#         return JsonResponse(response_data)
-#     except CustomUser.DoesNotExist:
-#         return render(request, '404.html')  
+# from django.core.serializers import serialize
+
+# def fetch_verification_codes(request):
+#     try:
+#         # Fetch the latest verification codes for the receiver user where is_picked is False and is_expired is False
+#         verification_codes = MailSmsVerificationCode.objects.filter(
+#             is_picked=False,
+#             expired=False
+#         )
+
+#         # Serialize the queryset to JSON
+#         codes_data = serialize('json', verification_codes)
+
+#         # Convert the serialized data to a list of dictionaries
+#         codes_data = json.loads(codes_data)
+
+#         # Iterate through the codes and add additional fields
+#         for code in codes_data:
+#             code_object = MailSmsVerificationCode.objects.get(id=code['pk'])
+#             code['receiver_username'] = code_object.receiver_member.user.username
+#             code['sender_full_name'] = code_object.sender_member.personal_details.get_full_name()
+
+#         print(codes_data)
+
+#         # Return the verification codes as JSON response
+#         return JsonResponse({'verification_codes': codes_data})
+
 #     except Exception as e:
-#         print(f"Error: {str(e)}")
-#         response_data = {'error': str(e)}
-#         return JsonResponse(response_data, status=500)
+#         return JsonResponse({'error': f"An error occurred: {str(e)}"}, status=500)
 
 
 
@@ -403,24 +452,27 @@ def loans(request):
 def get_guarantor_info(request, member_number):
     try:
         with transaction.atomic():
-            user = get_object_or_404(CustomUser, member_number=member_number)
+            user = get_object_or_404(CustomUser, member_number=member_number, is_approved=True, is_superuser=False, status="Approved")
 
             # Check if member number submitted matches the logged-in user
             if request.user.member.user.member_number == member_number:
-                loan_amount = request.GET.get('loan_amount')
+                loan_amount = float(request.GET.get('loan_amount', 0))
+                share_contribution = float(request.user.member.shares_contribution)
+                print(loan_amount)
+                print(share_contribution)
                 
-                if loan_amount is not None:
-                    try:
-                        loan_amount = float(loan_amount)
-                    except ValueError as e:
-                        print(f"Error converting loan_amount: {str(e)}")
-                        response_data = {'error': str(e)}
-                        return JsonResponse(response_data, status=500)
-                    share_contribution = float(request.user.member.shares_contribution)
+                # if loan_amount is not None:
+                #     try:
+                #         loan_amount = float(loan_amount)
+                #     except ValueError as e:
+                #         print(f"Error converting loan_amount: {str(e)}")
+                #         response_data = {'error': str(e)}
+                #         return JsonResponse(response_data, status=500)
+                #     share_contribution = float(request.user.member.shares_contribution)
 
-                    if loan_amount <= 0.9 * share_contribution:
-                        response_data = {'error': "Your share contribution must be at least 90% of the loan amount to qualify for self-guarantorship."}
-                        return JsonResponse(response_data, status=400)
+                #     if loan_amount <= 0.9 * share_contribution:
+                #         response_data = {'error': "Your share contribution must be at least 90% of the loan amount to qualify for self-guarantorship."}
+                #         return JsonResponse(response_data, status=400)
                     
             # Fetch personal, contact details and prepare response data
             personal_details = PersonalDetails.objects.get(member__user=user)
@@ -612,89 +664,112 @@ def filter_schedules(request):
 
 
 
+def generate_guarantorship_verification_code(request):
+    if request.method == 'POST':
+        data = json.loads(request.body.decode('utf-8'))
+        guarantor_id_number = data.get('guarantorIdNumber', '')
+
+        # Find the PersonalDetails instance associated with the guarantor_id_number
+        try:
+            personal_details = PersonalDetails.objects.get(idnumber=guarantor_id_number)
+        except PersonalDetails.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'PersonalDetails not found'})
+
+        # Now, you can access the associated Member instance through the related_name
+        guarantor = personal_details.member
+
+        # Get the member code sender (request user)
+        member_code_sender = request.user.member
+
+        # Generate a verification code using the VerificationCode model
+        verification_instance = MailSmsVerificationCode.generate_unique_code(member_code_sender, guarantor, 'guarantorship_verification')
+
+        # Check if the guarantor has an email
+        if guarantor.user.email:
+            # Get full name of the sender
+            sender_full_name = request.user.member.personal_details.get_full_name()
+            # Send email to the guarantor
+            subject = 'Guarantorship Verification Code'
+            message = f'Dear {guarantor.user.username},\n\n {sender_full_name} has nominated you as a guarantor for Loan. By sharing this code {verification_instance.code} you consent to providing and processing of your personal data and agree to the terms & conditions as listed at Parkside Villa Welfare Group.'
+            from_email = 'pvwgtestmail@hamiscodecraft.co.ke'
+            recipient_list = [guarantor.user.email]
+
+            send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Guarantor has no email'})
+
+        return JsonResponse({'status': 'success', 'verification_code': verification_instance.code})
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+
+def verify_mail_sms_code(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+            entered_code = data.get('code', '')
+
+            if not entered_code or not isinstance(entered_code, str) or len(entered_code) != 6:
+                return JsonResponse({'status': 'error', 'message': 'Invalid or missing verification code'})
+            
+            try:
+                # Retrieve the verification code from the database
+                verification_code = MailSmsVerificationCode.objects.get(code=entered_code)
+          
+                # Check if the code is expired or already picked
+                if verification_code.expired or verification_code.is_picked:
+                    return JsonResponse({'status': 'error', 'is_valid': False, 'is_expired': verification_code.expired, 'is_picked': False})
+
+                # Mark the code as picked
+                verification_code.is_picked = True
+                verification_code.save()
+
+                return JsonResponse({'status': 'success', 'is_valid': True, 'is_expired': False, 'is_picked': False})
+            except MailSmsVerificationCode.DoesNotExist:
+                return JsonResponse({'status': 'error', 'is_valid': False, 'is_expired': False, 'is_picked': False})
+        except json.decoder.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
 
 
 
+from django.http import JsonResponse
+from .models import MailSmsVerificationCode
+from django.utils import timezone
+
+# def fetch_verification_codes(request):
+#     # print("am hereeee")
+    
+#     # # Ensure the user is a Member instance
+#     # if hasattr(request.user, 'member'):
+#     #     receiver_member = request.user.member
+#     # else:
+#     #     return JsonResponse({'error': 'User is not a Member'}, status=400)
+
+#     # # Fetch the latest verification codes for the receiver user where is_picked is False and is_expired is False
+#     # verification_codes = MailSmsVerificationCode.objects.filter(receiver_member=receiver_member, is_picked=False, expired=False).order_by('-created_at')[:10]
+
+#     # # Print the count of fetched verification codes for debugging
+#     # print(f"Fetched Verification Codes: {verification_codes.count()}")
+
+#     # # Prepare data to be sent as JSON
+#     # data = [{
+#     #     'created_at': code.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+#     #     'code_purpose': code.code_purpose,
+#     #     'code': code.code,
+#     #     'description': code.description,
+#     #     'sender_member_id': code.sender_member.id,
+#     #     'sender_member_username': code.sender_member.user.username,
+#     #     'receiver_member_id': code.receiver_member.id,
+#     #     'receiver_member_username': code.receiver_member.user.username,
+#     # } for code in verification_codes]
+
+#     # print(data)
+
+#     return JsonResponse(data, safe=False)
 
 
-
-
-
-
-
-
-
-
-# def handle_loan_submission(request):
-#     if request.method == 'POST':
-#         try:
-#             loan_data = json.loads(request.body)['loanFormData']
-
-#             # Extracting relevant data from PersonalDetails
-#             idnumber = loan_data['personalDetails']['idnumber']
-#             borrowed_amount = loan_data['loanDetails']['amount']
-#             loan_purpose = loan_data['loanDetails']['loanPurpose']
-#             is_advance_loan = loan_data['loanDetails']['loanType']['advanceLoan']
-
-#             duration_months = int(loan_data['loanDetails']['repaymentPeriod'])
-#             interest_rate = Decimal(0.05)
-
-#             # Get PersonalDetails instance using the 'idnumber'
-#             try:
-#                 personal_details = PersonalDetails.objects.get(idnumber=idnumber)
-#             except PersonalDetails.MultipleObjectsReturned:
-#                 # If multiple instances exist, use the first one
-#                 personal_details = PersonalDetails.objects.filter(idnumber=idnumber).first()
-
-#             # Get or create Member instance using the 'personal_details' field
-#             member, created = Member.objects.get_or_create(
-#                 personal_details=personal_details
-#             )
-
-#             if is_advance_loan:
-#                 # Create AdvanceLoan instance
-#                 advance_loan = AdvanceLoan(
-#                     member=member,
-#                     borrowed_amount=borrowed_amount,
-#                     date_requested=timezone.now().date(),
-#                     loan_id='',
-#                     loan_purpose=loan_purpose,
-#                 )
-
-#                 # Save the AdvanceLoan instance
-#                 advance_loan.save()
-#                 return JsonResponse({'success': True, 'message': 'Advance Loan submitted successfully!'})
-#             else:
-#                 # Create WelfareLoan instance
-#                 welfare_loan = WelfareLoan(
-#                     member=member,
-#                     loan_id='',  
-#                     date_requested=timezone.now().date(),
-#                     borrowed_amount=borrowed_amount,
-#                     loan_purpose=loan_purpose,
-#                     interest_rate=interest_rate,
-#                     duration_months=duration_months,
-#                     is_disbursed=False, 
-#                     posting_date=timezone.now().date(),  
-#                     loan_maturity_date=timezone.now().date() + timedelta(days=(30 * duration_months)),
-#                     loan_amount_to_be_paid=borrowed_amount + (borrowed_amount * interest_rate * duration_months),
-#                     is_repaid=False, 
-#                     date_repaid=None,  
-#                 )
-#                 # Save the WelfareLoan instance
-#                 welfare_loan.save()
-
-#                 # Generate reducing table
-#                 welfare_loan.generate_reducing_table()
-
-#                 return JsonResponse({'success': True, 'message': 'Normal Loan submitted successfully!'})
-#         except json.JSONDecodeError as e:
-#             return JsonResponse({'error': 'Invalid JSON format'}, status=400)
-
-#     return JsonResponse({'error': 'Invalid request method'}, status=405)
-
-# ... (previous code)
 
 
 
@@ -703,15 +778,42 @@ def filter_schedules(request):
 def handle_loan_submission(request):
     if request.method == 'POST':
         try:
-            loan_data = json.loads(request.body)['loanFormData']
+            loan_data = json.loads(request.body)
+
+            print(loan_data)
+
             # Extracting relevant data form loanFromData
-            idnumber = loan_data['personalDetails']['idnumber']
-            borrowed_amount = loan_data['loanDetails']['amount']
-            loan_purpose = loan_data['loanDetails']['loanPurpose']
+            idnumber = loan_data['personalDetails']['id_number']
+            borrowed_amount = loan_data['loanDetails']['loan_amount']
+            loan_purpose = loan_data['loanDetails']['loan_purpose']
             is_advance_loan = loan_data['loanDetails']['loanType']['advanceLoan']
             is_welfare_loan = loan_data['loanDetails']['loanType']['normalLoan']
+
+            try:
+                personal_details = PersonalDetails.objects.get(idnumber=idnumber)
+                member = personal_details.member
+
+                # Check for disbursed and not repaid loans
+                has_disbursed_loan = member.advance_loans.filter(is_disbursed=True, is_repaid=False).exists() or \
+                                    member.welfare_loans.filter(is_disbursed=True, is_repaid=False).exists()
+
+                if has_disbursed_loan:
+                    return JsonResponse({'error': 'User already has a disbursed loan. Cannot submit a new loan.'}, status=400)
+
+                # Check for pending loan application
+                pending_loan_application = member.advance_loans.filter(is_disbursed=False, is_repaid=False, status='pending').exists() or \
+                                        member.welfare_loans.filter(is_disbursed=False, is_repaid=False, status='pending').exists()
+
+                if pending_loan_application:
+                    return JsonResponse({'error': 'User already has a pending loan application. Please wait for approval.'}, status=400)
+
+            except PersonalDetails.DoesNotExist:
+                # Handle the case where PersonalDetails with the given idnumber doesn't exist
+                return JsonResponse({'error': 'User not found.'}, status=404)
+            
             duration_months = None
             interest_rate = None
+
             # Check if 'loanDetails' key exists in loan_data and contains the necessary fields
             loan_details = loan_data.get('loanDetails')
             if not loan_details:
@@ -722,11 +824,12 @@ def handle_loan_submission(request):
             except PersonalDetails.MultipleObjectsReturned:
                 # If multiple instances exist, use the first one
                 personal_details = PersonalDetails.objects.filter(idnumber=idnumber).first()
+                
             # Get or create Member instance using the 'personal_details' field
             member, created = Member.objects.get_or_create(
                 personal_details=personal_details
             )
-
+            
             # handle advance loan
             if is_advance_loan:
                 # Create AdvanceLoan instance
@@ -743,11 +846,11 @@ def handle_loan_submission(request):
                 if guarantor_data:
                     # Assuming guarantor_data is a list of dictionaries
                     for guarantor in guarantor_data:
-                        guarantor_member_number = guarantor.get('memberNumber')
+                        guarantor_member_number = guarantor.get('member_number')
                         guarantor_status = guarantor.get('status')
-                        guarantor_full_name = guarantor.get('fullName')
-                        guarantor_id_number = guarantor.get('idNumber')
-                        guarantor_phone_number = guarantor.get('phoneNumber')
+                        guarantor_full_name = guarantor.get('full_name')
+                        guarantor_id_number = guarantor.get('id_number')
+                        guarantor_phone_number = guarantor.get('phone_number')
                         # Create Guarantor instance for AdvanceLoan
                         advance_loan_guarantor = Guarantor(
                             advance_loan=advance_loan,
@@ -771,21 +874,24 @@ def handle_loan_submission(request):
 
             # handle welfare loan
             elif is_welfare_loan:
-                repayment_period = loan_data['loanDetails'].get('repaymentPeriod')
-                monthly_installment = loan_data['loanDetails'].get('monthlyInstallment')
+                repayment_period = loan_data['loanDetails'].get('repayment_period')
+                monthly_installment = loan_data['loanDetails'].get('monthly_installment')
                 # Check if repayment_period or monthly_installment is None or empty string
                 if repayment_period is None or monthly_installment is None:
                     return JsonResponse({'error': 'Invalid or missing repaymentPeriod or installment'}, status=400)
+               
                 # Convert to integers
                 try:
                     duration_months = int(repayment_period)
-                    monthly_installment_value = int(monthly_installment)
+                    monthly_installment_value = Decimal(str(monthly_installment))
                     interest_rate = Decimal(0.05)
                 except ValueError:
                     return JsonResponse({'error': 'Invalid values for repaymentPeriod or installment'}, status=400)
+            
                 # Additional check for positive values
-                if duration_months <= 0 or monthly_installment_value <= 0:
+                if Decimal(str(duration_months)) <= 0 or Decimal(str(monthly_installment_value)) <= 0:
                     return JsonResponse({'error': 'Invalid duration_months or installment values'}, status=400)
+              
                 # Create WelfareLoan instance
                 welfare_loan = WelfareLoan(
                     member=member,
@@ -800,16 +906,18 @@ def handle_loan_submission(request):
                     posting_date=timezone.now().date(),
                 )
                 welfare_loan.save()
+                    
                 # Create welfare loan guarantor instance
                 guarantor_data = loan_data.get('guarantors')
+               
                 if guarantor_data:
                     # Assuming guarantor_data is a list of dictionaries
                     for guarantor in guarantor_data:
-                        guarantor_member_number = guarantor.get('memberNumber')
+                        guarantor_member_number = guarantor.get('member_number')
                         guarantor_status = guarantor.get('status')
-                        guarantor_full_name = guarantor.get('fullName')
-                        guarantor_id_number = guarantor.get('idNumber')
-                        guarantor_phone_number = guarantor.get('phoneNumber')
+                        guarantor_full_name = guarantor.get('full_name')
+                        guarantor_id_number = guarantor.get('id_number')
+                        guarantor_phone_number = guarantor.get('phone_number')
                         # Create Guarantor instance for WelfareLoan
                         welfare_loan_guarantor = Guarantor(
                             welfare_loan=welfare_loan,
@@ -821,8 +929,10 @@ def handle_loan_submission(request):
                             loan_type_guaranteed='Normal',
                         )
                         welfare_loan_guarantor.save()
+                   
                 # Generate reducing table
-                welfare_loan.generate_reducing_table()        
+                welfare_loan.generate_reducing_table()   
+                 
                 # Create a transaction record for the loan submission
                 Transaction.objects.create(
                     member=member,
@@ -834,15 +944,54 @@ def handle_loan_submission(request):
                 return JsonResponse({'success': True, 'message': 'Normal Loan submitted successfully!'})
             
             else:
-                return JsonResponse({'error': 'Atleast advance or normal Loan must be checked, both cannot be false'})
+                return JsonResponse({'error': 'At least advance or normal Loan must be checked, both cannot be false'})
+
         except json.JSONDecodeError as e:
             return JsonResponse({'error': 'Invalid JSON format'}, status=400)
+        except Exception as e:
+            print(f'Error: {str(e)}')
+            return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 
 
+# MONTHLY SHARE ADJUSTMENT VIEWS START
 
+
+# SHARE ADJUSTMENT PIN CHECK
+@login_required
+def checkPinForShareAdjustment(request):
+    user = request.user
+
+    if request.method == 'POST':
+        try:
+            member_number_toAdjustShares = request.POST.get('memberNumbersa')
+            shareAmountToAdjust = request.POST.get('adjustContributions_amount')
+         
+            # Retrieve the user for share Amount To Adjust
+            shareAmountToAdjust_user = CustomUser.objects.get(member_number=member_number_toAdjustShares)
+            user_current_share_contributions = user.member.share_amount.share_amount 
+
+            pin = request.POST.get('pin')
+
+            # Check if the entered PIN matches the user's password
+            if user.check_password(pin):
+                # Construct the confirmation message with recipient's username and share amount
+                confirmation_message = f'Are you sure you want to change your monthly share contributions from {user_current_share_contributions} to {shareAmountToAdjust} ?'
+
+                return JsonResponse({'correct': True, 'confirmation_message': confirmation_message})
+            else:
+                return JsonResponse({'error': False, 'incorrect_pin': 'Incorrect PIN'})
+
+        except ObjectDoesNotExist:
+            return JsonResponse({'error': False, 'error': 'Recipient user does not exist'})
+
+    else:
+        return JsonResponse({'status': 'error'})
+    
+
+# HADDNLE SHARE ADJUSTMENT SUBMISSION
 def Submit_Share_Adjustment(request):
     if request.method == 'POST':
         try:
@@ -864,10 +1013,14 @@ def Submit_Share_Adjustment(request):
             # Retrieve the existing AdjustedShareContributions record for the member
             adjusted_share = AdjustedShareContributions.objects.filter(member=member).first()
 
+            # user current share contributions
+            user = request.user
+            user_current_share_contributions = user.member.share_amount.share_amount 
+
             if adjusted_share:
                 # Update the existing record
                 adjusted_share.share_amount = adjusted_share.share_amount
-                adjusted_share.new_amount = data['adjustContributions']
+                adjusted_share.new_amount = data['adjustContributions_amount']
                 adjusted_share.is_approved = False
                 adjusted_share.status = 'pending'
                 adjusted_share.save()
@@ -876,7 +1029,7 @@ def Submit_Share_Adjustment(request):
                 adjusted_share = AdjustedShareContributions.objects.create(
                     member=member,
                     share_amount=member.shares_contribution,
-                    new_amount=data['adjustContributions'],
+                    new_amount=data['adjustContributions_amount'],
                     is_approved=False,
                     status='pending'
                 )
@@ -886,12 +1039,12 @@ def Submit_Share_Adjustment(request):
                 Transaction.objects.create(
                     member=member,
                     activity_type='share adjustment',
-                    description=f'Share contribution adjustment request of {data["adjustContributions"]}',
+                    description=f'Share contribution adjustment request of {data["adjustContributions_amount"]}',
                     debit=0,  
-                    credit=data['adjustContributions'],  
+                    credit=data['adjustContributions_amount'],  
                 )
 
-            return JsonResponse({'status': 'success'})
+            return JsonResponse({'status': 'success', 'old_amount': user_current_share_contributions, 'new_amount': adjusted_share.new_amount})
         except json.JSONDecodeError as e:
             return JsonResponse({'error': 'Invalid JSON format'}, status=400)
 
@@ -993,6 +1146,8 @@ def Submit_Share_Adjustment(request):
 
 
 
+
+# SHARE TRANSFER PIN CHECK
 @login_required
 def checkPinForShareTransfer(request):
     user = request.user
@@ -1001,26 +1156,35 @@ def checkPinForShareTransfer(request):
         try:
             recipient_member_number = request.POST.get('membernumberst')
             shareAmountToTransfer = request.POST.get('shareAmountToTransfer')
-         
-            # Retrieve the recipient user based on the member number
-            recipient_user = CustomUser.objects.get(member_number=recipient_member_number)
-
-            pin = request.POST.get('pin')
 
             # Check if the entered PIN matches the user's password
-            if user.check_password(pin):
-                # Construct the confirmation message with recipient's username and share amount
-                confirmation_message = f'Are you sure you want to Transfer {shareAmountToTransfer} shares to {recipient_user.username} ?'
+            pin = request.POST.get('pin')
+            if not user.check_password(pin):
+                return JsonResponse({'correct': False, 'error': 'Incorrect PIN. Please enter the correct PIN and try again.'})
 
-                return JsonResponse({'correct': True, 'confirmation_message': confirmation_message})
-            else:
-                return JsonResponse({'correct': False, 'error': 'Incorrect PIN'})
+            # Retrieve the recipient user based on the member number
+            try:
+                recipient_user = CustomUser.objects.get(member_number=recipient_member_number)
+            except ObjectDoesNotExist:
+                return JsonResponse({'correct': False, 'error': 'The recipient user does not exist. Please check the member number and try again.'})
 
-        except ObjectDoesNotExist:
-            return JsonResponse({'correct': False, 'error': 'Recipient user does not exist'})
+            # Check if recipient is the same as the requesting user
+            if recipient_user == user:
+                return JsonResponse({'correct': False, 'error': 'PVW Cannot complete the transfer because both parties are of the same member number.'})
+
+            # Construct the confirmation message with recipient's username and share amount
+            confirmation_message = f'Are you sure you want to Transfer {shareAmountToTransfer} shares to {recipient_user.username} ?'
+
+            return JsonResponse({'correct': True, 'sameUser': False, 'confirmation_message': confirmation_message})
+
+        except Exception as e:
+            # Handle other exceptions if necessary
+            return JsonResponse({'correct': False, 'error': str(e)})
 
     else:
         return JsonResponse({'status': 'error'})
+
+
 
 
 
@@ -1032,24 +1196,18 @@ def transfer_shares(request):
     sender_shareBalance = shareBalance.shares_contribution
 
     if request.method == 'POST':
-
-        print(request.POST)
-
         sender_member_number = user.member_number
         recipient_member_number = request.POST.get('membernumberst')
-        shareAmountToTransfer = request.POST.get('shareAmountToTransfer')
-        print(shareAmountToTransfer)
+        shareAmountToTransfer = decimal.Decimal(request.POST.get('shareAmountToTransfer'))  
         reason_for_shareTransfer = request.POST.get('transferReason', '')
 
         try:
             sender_user = CustomUser.objects.get(member_number=sender_member_number)
-            print(sender_user)
         except CustomUser.DoesNotExist:
             return JsonResponse({'error': 'Invalid Sender'})
 
         try:
             recipient_user = CustomUser.objects.get(member_number=recipient_member_number)
-            print(recipient_user)
         except CustomUser.DoesNotExist:
             print("Invalid Receiver")
             return JsonResponse({'error': 'Invalid Receiver'})
@@ -1057,26 +1215,25 @@ def transfer_shares(request):
         if sender_member_number == recipient_member_number or sender_user == recipient_user:
             return JsonResponse({'error': 'Failed. Cannot complete this operation. Both parties of the transaction are the same identity. For more information contact the administrator.'})
 
-        if sender_shareBalance >= shareAmountToTransfer:
-            recipient_member = Member.objects.get(user=recipient_user)
-            recipient_shareBalance = recipient_member.shares_contribution
+        with transaction.atomic():
+            if sender_shareBalance >= shareAmountToTransfer:
+                recipient_member = Member.objects.get(user=recipient_user)
+                recipient_shareBalance = recipient_member.shares_contribution
 
-            sender_shareBalance -= shareAmountToTransfer
-            recipient_shareBalance += shareAmountToTransfer
+                sender_shareBalance -= shareAmountToTransfer
+                recipient_shareBalance += shareAmountToTransfer
 
-            shareBalance.shares_contribution = sender_shareBalance
-            recipient_member.shares_contribution = recipient_shareBalance
+                shareBalance.shares_contribution = sender_shareBalance
+                recipient_member.shares_contribution = recipient_shareBalance
 
-            shareBalance.save()
-            recipient_member.save()
+                shareBalance.save()
+                recipient_member.save()
 
-            return JsonResponse({'success': 'Transfer was successful!'})
-        else:
-            return JsonResponse({'error': 'Insufficient Share balance'})
+                return JsonResponse({'success': 'Transfer was successful!'})
+            else:
+                return JsonResponse({'error': 'Insufficient Share balance'})
 
     return JsonResponse({'error': 'Invalid request'})
-
-
 
 
 
@@ -1226,3 +1383,7 @@ def faq(request):
         'page_title': page_title,
     }
     return render(request, 'faq.html', context)
+
+
+
+  

@@ -13,8 +13,19 @@
         </div>
         <div class="welfareSummaryStats" id="welfareSummaryStatistics">
             <div class="centeredStats">
+
                 <div class="summary">
-                    <p>Welfare Income On Shares Contributed(Balance)</p>
+                    <p>Income From New Registered Accounts(Balance)</p>
+                    <div class="valuedataStats">
+                        <p> {{ welfare_income_from_new_acccounts_registration_balance }} <span class="selected-currency"> KES</span></p>
+                        <figure id="profile-container" style="width: 40px; height: 40px; overflow: hidden; border-radius: 50%;margin-left:1vw;">
+                            <img id="profile-image" src="../../static/images/pics/deposit-ico.svg" alt="Profile Picture" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />
+                        </figure>
+                    </div> 
+                </div>
+
+                <div class="summary">
+                    <p>Income On Shares Contributed(Balance)</p>
                     <div class="valuedataStats">
                         <p>{{ welfare_shares_balance }}<span class="selected-currency"> KES</span></p>
                         <figure id="profile-container" style="width: 40px; height: 40px; overflow: hidden; border-radius: 50%;margin-left:1vw;">
@@ -24,7 +35,7 @@
                 </div>
     
                 <div class="summary">
-                    <p>Welfare Income On Benevolent Contributed(Balance)</p>
+                    <p>Income On Benevolent Contributed(Balance)</p>
                     <div class="valuedataStats">
                         <p>{{ welfare_benevolent_balance }} <span class="selected-currency"> KES</span></p>
                         <figure id="profile-container" style="width: 40px; height: 40px; overflow: hidden; border-radius: 50%;margin-left:1vw;">
@@ -34,7 +45,7 @@
                 </div>
     
                 <div class="summary">
-                    <p>Welfare Income From Loan Interest(Balance)</p>
+                    <p>Income From Loan Interest(Balance)</p>
                     <div class="valuedataStats">
                         <p>{{ welfare_loanInterest_balance }} <span class="selected-currency"> KES</span></p>
                         <figure id="profile-container" style="width: 40px; height: 40px; overflow: hidden; border-radius: 50%;margin-left:1vw;">
@@ -46,19 +57,23 @@
                 <div class="summary">
                     <p>Active Members</p>
                     <div class="valuedataStats">
-                        <p>{{ welfare_activeMembers }} <span class="selected-currency"> KES</span></p>
-                        <figure id="profile-container" style="width: 40px; height: 40px; overflow: hidden; border-radius: 50%;margin-left:1vw;">
-                            <img id="profile-image" src="../../static/images/pics/deposit-ico.svg" alt="Profile Picture" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />
-                        </figure> 
+                        <p>{{ welfare_activeMembers }} <span class="selected-currency"> </span></p>
+                        <i class="fa fa-users" aria-hidden="true" style="font-size: 2rem;font-weight:bold;"></i>
                     </div>
                 </div>
             </div>
         </div>
         <div class="welfareSummaryStats none" id="welfareTransactionSummary">
             <p>WTS</p>
+            <p>This view is likely being updated on the server.</p>
+            <p>It will display as soon as the updates completes.</p>
+            <p>You can continue working with other tabs or try accessing other views/folders.</p>
         </div>
         <div class="welfareSummaryStats none" id="welfareChartsSummary">
             <p>WCS</p>
+            <p>This view is likely being updated on the server.</p>
+            <p>It will display as soon as the updates completes.</p>
+            <p>You can continue working with other tabs or try accessing other views/folders.</p>
         </div>
 
         <div class="overlaypvwUpdate overlay" id="overlaypvwUpdate">
@@ -91,6 +106,24 @@
     <div class="my-details-tittle profile-tittle">
         <button id="getPvwContributionButtons" class="getPvwContributionButtons">PVW Update Contributions</button>
     </div>
+    <!-- pvw update contributions preloader -->
+    <div id="preloader" style="display: none;">
+        <div class="lds-spinner">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <p class="lds-text">Fetching data to be updated...</p>
+    </div>
 
 </section>
 
@@ -111,6 +144,9 @@
         }
     }
 </script>
+
+
+
 
 
 <style>

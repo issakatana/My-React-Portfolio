@@ -57,8 +57,8 @@
                 </div>            
                 <div class="input-group">
                     <label for="idnumber">ID Number<sup>*</sup></label>
-                    <input type="text" name="idnumber" id="idnumber">
-                    <div id="idnumber-error" class="input-error-div"></div>
+                    <input type="number" name="idnumber" id="idnumber">
+                    <div id="idnumber-error" class="input-error-div" ></div>
                 </div>
                 <div class="input-group">
                     <label for="dob">Date of Birth<sup>*</sup></label>
@@ -84,7 +84,7 @@
                         <option value="Support">Support</option>
                         <option value="Other">Other</option>
                     </select>
-                    <div id="gender-error" class="input-error-div"></div>
+                    <div id="position-error" class="input-error-div"></div>
                 </div>
 
                 <div class="input-group">
@@ -120,7 +120,7 @@
             <div class="contact-details-form-input">
                 <div class="input-group">
                     <label for="phoneno">Phone Number<sup>*</sup></label>
-                    <input type="text" name="phoneno" id="phoneno">
+                    <input type="number" name="phoneno" id="phoneno">
                     <div id="phoneno-error" class="input-error-div"></div>
                 </div>
                 <div class="input-group">
@@ -214,14 +214,14 @@
                         
                         <div class="input-group">
                             <label for="dependantidnumber"></label>
-                            <input type="text" id="dependantidnumber" name="dependantidnumber" placeholder="ID Number/Birth Certificate Number">
+                            <input type="number" id="dependantidnumber" name="dependantidnumber" placeholder="ID Number/Birth Certificate Number">
                             <div id="dependantidnumber-error" class="input-error-div"></div>
                         </div>
                         <div class="input-group">
                             <label for="dependantcontact"></label>
-                            <input type="text" id="dependantcontact" name="dependantcontact" placeholder="Contact">
+                            <input type="number" id="dependantcontact" name="dependantcontact" placeholder="Contact">
                             <div id="dependantcontact-error" class="input-error-div"></div>
-                        </div>
+                        </div>                        
                     </div>
                     <button id="addDependant" class="dependant-btn">Add Dependant</button>
                 </div>
@@ -268,12 +268,12 @@
                         </div>
                         <div class="input-group">
                             <label for="nextofkinidnumber"></label>
-                            <input type="text" id="nextofkinidnumber" name="nextofkinidnumber" placeholder="ID Number/Birth Certificate Number">
+                            <input type="number" id="nextofkinidnumber" name="nextofkinidnumber" placeholder="ID Number/Birth Certificate Number">
                             <div id="nextofkinidnumber-error" class="input-error-div"></div>
                         </div>
                         <div class="input-group">
                             <label for="nextofkincontact"></label>
-                            <input type="text" id="nextofkincontact" name="nextofkincontact" placeholder="Contact">
+                            <input type="number" id="nextofkincontact" name="nextofkincontact" placeholder="Contact">
                             <div id="nextofkincontact-error" class="input-error-div"></div>
                         </div>
                     </div>
@@ -287,12 +287,15 @@
         </div>
         
         <!-- Review section -->
-        <div class="form-step">
+        <div class="form-step" >
             <div class="progress-title">
                 <p>Review of Form Data:</p>
             </div>
-            <div id="reviewOfFormData">
+
+            <div id="reviewOfFormData" class="html_to_pdf" >
+
             </div>
+
             <p class="review-p">
                 <label>
                     <input type="checkbox" name="agreement" value="accepted" required>
@@ -301,39 +304,76 @@
             </p>
             <div class="btns-group">
                 <a href="#" class="btn btn-prev">Back</a>
+                <!-- <button type="submit" id="submitFormButton" class="btn btn-submit">Submit Request</button> -->
+                <!-- Add a button or trigger to initiate the PDF generation and form submission -->
                 <button type="submit" id="submitFormButton" class="btn btn-submit">Submit Request</button>
             </div>
         </div>
+
     </section>
+
+    <!-- Signup preloader -->
+    <div id="preloader" style="display: none;">
+        <div class="lds-spinner">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <p class="lds-text">Creating account...</p>
+    </div>
+    
+    
 </section>
 <!-- .......................signup-page end..................... -->
 
 
+
+<!-- 
 <script>
     // SEND DATA TO DJANGO BACKEND
     document.addEventListener('DOMContentLoaded', function () {  
-        document.getElementById('submitFormButton').addEventListener('click', function () {
-            fetch(`{% url 'save_form_data' %}`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
-                body: JSON.stringify({ formData }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Check if the form data is saved successfully
-                if (data.status === 'success') {
-                    window.location.href = data.redirect_url;
-                } else {
-                    console.error('Error saving form data:', data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error saving form data:', error);
-            });
+        document.getElementById('submitFormButton').addEventListener('click', function (event) {
+            event.preventDefault(); 
+
+            if (event.target.id === 'submitFormButton') {
+
+                fetch(`{% url 'save_form_data' %}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({ formData }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Check if the form data is saved successfully
+                    if (data.status === 'success') {
+                        HTMLtoPDF();
+                        window.location.href = data.redirect_url;
+                    } else {
+                        console.error('Error saving form data:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving form data:', error);
+                });
+
+            } else {
+                alert('Submit button not clicked')
+            }
+
         });
+
         // custom csrf
         function getCookie(name) {
             const cookieName = name + "=";
@@ -348,8 +388,178 @@
             }
             return null;
         }
+
+        function HTMLtoPDF() {
+
+            var doc = new jsPDF();
+
+            var HTMLelement = $('.html_to_pdf').html()
+            
+            doc.fromHTML(HTMLelement, 10, 10, {
+               'width' : 190
+            })
+          
+            doc.save('PvwApprovalPdf.pdf');
+        }
+        
+    });
+</script> -->
+
+<script>
+    // SEND DATA TO DJANGO BACKEND
+    document.addEventListener('DOMContentLoaded', function () {  
+        document.getElementById('submitFormButton').addEventListener('click', function () {
+            
+            // Show preloader while waiting for the backend response
+            showPreloader();
+            
+            if (event.target.id === 'submitFormButton') {
+                
+                fetch(`{% url 'save_form_data' %}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({ formData }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Check if the form data is saved successfully
+                    if (data.status === 'success') {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        console.error('Error saving form data:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving form data:', error);
+                })
+                .finally(() => {
+                    // Hide preloader after receiving the backend response (success or error)
+                    hidePreloader();
+                });;
+            
+            } else {
+                alert('Submit button not clicked');
+                // Hide preloader if there's an issue with form submission
+                hidePreloader();
+            }        
+            
+        });
+        
+        // custom csrf
+        function getCookie(name) {
+            const cookieName = name + "=";
+            const decodedCookies = decodeURIComponent(document.cookie);
+            const cookieArray = decodedCookies.split(';');
+
+            for (let i = 0; i < cookieArray.length; i++) {
+                let cookie = cookieArray[i].trim();
+                if (cookie.indexOf(cookieName) === 0) {
+                    return cookie.substring(cookieName.length);
+                }
+            }
+            return null;
+        }
+        
+        function showPreloader() {
+            // Show the preloader by setting its display property to 'block'
+            document.getElementById('preloader').style.display = 'block';
+        }
+
+        function hidePreloader() {
+            // Hide the preloader by setting its display property to 'none'
+            document.getElementById('preloader').style.display = 'none';
+        }
+        
     });
 </script>
+<!-- <script>
+    // SEND DATA TO DJANGO BACKEND
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('submitFormButton').addEventListener('click', function (event) {
+            event.preventDefault();
+
+            // Show preloader while waiting for the backend response
+            showPreloader();
+
+            if (event.target.id === 'submitFormButton') {
+
+                fetch(`{% url 'save_form_data' %}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify({ formData }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide preloader after receiving the backend response
+                    hidePreloader();
+
+                    // Check if the form data is saved successfully
+                    if (data.status === 'success') {
+                        HTMLtoPDF();
+                        window.location.href = data.redirect_url;
+                    } else {
+                        console.error('Error saving form data:', data.error);
+                    }
+                })
+                .catch(error => {
+                    // Hide preloader in case of an error
+                    hidePreloader();
+
+                    console.error('Error saving form data:', error);
+                });
+
+            } else {
+                alert('Submit button not clicked');
+                // Hide preloader if there's an issue with form submission
+                hidePreloader();
+            }
+
+        });
+
+        // custom csrf
+        function getCookie(name) {
+            const cookieName = name + "=";
+            const decodedCookies = decodeURIComponent(document.cookie);
+            const cookieArray = decodedCookies.split(';');
+
+            for (let i = 0; i < cookieArray.length; i++) {
+                let cookie = cookieArray[i].trim();
+                if (cookie.indexOf(cookieName) === 0) {
+                    return cookie.substring(cookieName.length);
+                }
+            }
+            return null;
+        }
+
+        function HTMLtoPDF() {
+            var doc = new jsPDF();
+            var HTMLelement = $('.html_to_pdf').html();
+
+            doc.fromHTML(HTMLelement, 10, 10, {
+                'width': 190
+            });
+
+            doc.save('PvwApprovalPdf.pdf');
+        }
+
+        function showPreloader() {
+            // Show the preloader by setting its display property to 'block'
+            document.getElementById('preloader').style.display = 'block';
+        }
+
+        function hidePreloader() {
+            // Hide the preloader by setting its display property to 'none'
+            document.getElementById('preloader').style.display = 'none';
+        }
+    });
+</script> -->
+
 
 
 <style>

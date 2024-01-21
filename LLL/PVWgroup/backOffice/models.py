@@ -129,6 +129,7 @@ class WelfareLoan(models.Model):
             ('pending', 'Pending'),
             ('approved', 'Approved'),
             ('rejected', 'Rejected'),
+            ('cleared', 'Cleared'),
         ],
         default='pending'
     )
@@ -136,16 +137,19 @@ class WelfareLoan(models.Model):
     class Meta:
         db_table = 'backOffice_WelfareLoan'
 
+    def get_guarantors(self):
+        return self.welfare_guarantors.all()    
+
     def generate_reducing_table(self):
         reducing_table = []
-        monthly_installment = self.borrowed_amount / Decimal(self.duration_months)
-        outstanding_loan_principal = self.borrowed_amount
+        monthly_installment = Decimal(str(self.borrowed_amount)) / Decimal(str(self.duration_months))
+        outstanding_loan_principal = Decimal(str(self.borrowed_amount))
         current_date = self.posting_date
 
         for month in range(1, self.duration_months + 1):
-            interest = outstanding_loan_principal * self.interest_rate
+            interest = Decimal(str(outstanding_loan_principal)) * Decimal(str(self.interest_rate))
             amount_due = monthly_installment + interest
-            outstanding_loan_principal -= monthly_installment
+            outstanding_loan_principal -= Decimal(str(monthly_installment))
             last_day_of_month = monthrange(current_date.year, current_date.month)[1]
             installment_maturity_date = date(current_date.year, current_date.month, last_day_of_month)
        
@@ -211,12 +215,21 @@ class ReducingTable(models.Model):
             ('notpaid', 'Not Paid'),
             ('granted', 'Granted'),
             ('rejected', 'Rejected'),
+            ('cleared', 'Cleared'),
         ],
         default='notpaid'
     )
 
+    @property
+    def total_amount_formatted(self):
+        try:
+            total_amount = float(self.outstanding_loan_principal or 0) + float(self.installment or 0)
+            return "{:,.2f}".format(total_amount)
+        except (ValueError, TypeError):
+            return "N/A"
+
     def __str__(self):
-        return f"Reducing Table - {self.welfare_loan.loan_id} - Month {self.duration_months - self.months_remaining + 1}"
+        return f"Reducing Table - {self.welfare_loan.loan_id} - Month {self.month - self.months_remaining + 1}"
 
 
 class AdvanceLoan(models.Model):
@@ -234,6 +247,7 @@ class AdvanceLoan(models.Model):
             ('pending', 'Pending'),
             ('approved', 'Approved'),
             ('rejected', 'Rejected'),
+            ('cleared', 'Cleared'),
         ],
         default='pending'
     )
@@ -243,11 +257,14 @@ class AdvanceLoan(models.Model):
     is_repaid = models.BooleanField(default=False)
     date_repaid = models.DateField(null=True, blank=True)
 
+    def get_guarantors(self):
+        return self.advance_guarantors.all()
+
     def calculate_amount_to_be_paid(self):
         """
         Calculate the total amount to be paid, including principal and interest.
         """
-        self.amount_to_be_paid = self.borrowed_amount + self.interest
+        self.amount_to_be_paid = float(self.borrowed_amount) + float(self.interest)
 
     def save(self, *args, **kwargs):
         """
@@ -256,7 +273,7 @@ class AdvanceLoan(models.Model):
         if not self.loan_id:
             unique_code = uuid.uuid4().hex[:8].upper()
             self.loan_id = f"Pvw-Ad-{unique_code}"
-        self.interest = self.borrowed_amount * self.interest_rate
+        self.interest = float(self.borrowed_amount) * float(self.interest_rate)
         self.calculate_amount_to_be_paid()
         last_day_of_month = timezone.datetime(self.date_requested.year, self.date_requested.month, 1) + timezone.timedelta(days=32)
         self.maturity_date = last_day_of_month.replace(day=1) - timezone.timedelta(days=1)
@@ -302,6 +319,7 @@ class Guarantor(models.Model):
         ('Pending', 'Pending Acceptance'),
         ('Accepted', 'Accepted'),
         ('Rejected', 'Rejected'),
+        ('cleared', 'Cleared'),
     ]
 
     LOAN_TYPE_CHOICES = [
@@ -318,6 +336,7 @@ class Guarantor(models.Model):
     signature_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     loan_type_guaranteed = models.CharField(max_length=10, choices=LOAN_TYPE_CHOICES, default='none')
     guaranteed_repaid = models.BooleanField(default=False)
+    verification_code = models.CharField(max_length=6, unique=True, null=True, blank=True) 
    
     def __str__(self):
         return f"Guarantor for {self.advance_loan or self.welfare_loan} - {self.get_signature_status_display()}"
@@ -387,6 +406,28 @@ class Payroll(models.Model):
                     self.loan_wf = 0
                     self.save()
 
+    def update_salary_advance_loan(self):
+        """
+        Update the salary advance loan in the Payroll model for each member.
+        """
+        # Fetch AdvanceLoans where is_repaid is False and amount_to_be_paid is greater than zero
+        advance_loans_due = AdvanceLoan.objects.filter(
+            member=self.member,  # Assuming the Payroll model has a member field
+            is_repaid=False,
+            status="approved",
+            is_disbursed=True,
+            amount_to_be_paid__gt=0
+        )
+
+        # Check if there are any advance loans
+        if advance_loans_due.exists():
+            # Calculate total amount_to_be_paid for all loans
+            total_amount_to_be_paid = sum(loan.amount_to_be_paid for loan in advance_loans_due)
+
+            # Update the advance field in the Payroll model with the outstanding balance after repayment
+            self.advance = total_amount_to_be_paid
+            self.save()
+
     def __init__(self, *args, **kwargs):
         super(Payroll, self).__init__(*args, **kwargs)
 
@@ -397,6 +438,7 @@ class Payroll(models.Model):
 
 
 class WelfareStatistics(models.Model):
+    welfare_new_acccounts_reg = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     welfare_shares_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     welfare_benevolent_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     welfare_loanInterest_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
@@ -406,7 +448,7 @@ class WelfareStatistics(models.Model):
         return f"Welfare Statistics - {self.id}"
     
     # PVW UpdateContributions
-    def calculate_overall_balances(self, total_share_amount, total_benevolent_amount):
+    def calculate_overall_balances(self, total_share_amount, total_benevolent_amount, total_loan_interest):
         # Check if WelfareStatistics instance exists
         if self.pk:
             # Include overall balances
@@ -418,7 +460,7 @@ class WelfareStatistics(models.Model):
                 # Calculate after balances as the sum of individual contributions and before balances
                 'total_welfare_shares_contribution_after': total_share_amount + self.welfare_shares_balance,
                 'total_welfare_benovelent_contribution_after': total_benevolent_amount + self.welfare_benevolent_balance,
-                'total_welfare_interest_after': self.welfare_loanInterest_balance,
+                'total_welfare_interest_after': total_loan_interest + self.welfare_loanInterest_balance,
             }
         else:
             # Set default values if WelfareStatistics instance doesn't exist
@@ -434,12 +476,13 @@ class WelfareStatistics(models.Model):
         return overall_balances
     
 
-    def update_welfare_balances(self, total_share_amount, total_benevolent_amount):
+    def update_welfare_balances(self, total_share_amount, total_benevolent_amount, total_loan_interest):
         """
         Update welfare shares and benevolent balances based on provided amounts.
         """
         self.welfare_shares_balance = total_share_amount
         self.welfare_benevolent_balance = total_benevolent_amount
+        self.welfare_loanInterest_balance = total_loan_interest
         self.save()
     
 

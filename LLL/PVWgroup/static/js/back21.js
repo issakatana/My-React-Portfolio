@@ -543,17 +543,20 @@ document.addEventListener('DOMContentLoaded', function () {
                                     <th>Status</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr>
-                                    <td>${data.guarantors[0].full_name}</td>
-                                    <td>${data.guarantors[0].member_number}</td>
-                                    <td>${data.guarantors[0].id_number}</td>
-                                    <td>${data.guarantors[0].phone_number}</td>
-                                    <td>${data.guarantors[0].loan_type_guaranteed}</td>
-                                    <td>${data.guarantors[0].signature_status}</td>
-                                </tr>
+                            <tbody id="guarantorsTableBody">
+                                <!-- Guarantors data will be inserted here using JavaScript -->
+                                ${data.guarantors.map(guarantor => `
+                                    <tr>
+                                        <td>${guarantor.full_name}</td>
+                                        <td>${guarantor.member_number}</td>
+                                        <td>${guarantor.id_number}</td>
+                                        <td>${guarantor.phone_number}</td>
+                                        <td>${guarantor.loan_type_guaranteed}</td>
+                                        <td>${guarantor.signature_status}</td>
+                                    </tr>
+                                `).join('')}
                             </tbody>
-                        </table>    
+                        </table>
                     </div>
                     <div class=" pending-approvaladv">
                         <div class="my-member-tittle profile-tittle">
@@ -623,67 +626,98 @@ document.addEventListener('DOMContentLoaded', function () {
                         event.preventDefault();
                         const url = rejectClonedLink.getAttribute("data-rejectAdvanceLoan-url");
                     
-                        fetch(`reject_advanceLoan_request/${advanceloanId}/`)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! Status: ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                Swal.fire({
-                                    icon: "success",
-                                    title: "Advance Loan Rejected!",
-                                    html: `You have successfully rejected the advance loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
-                                }).then(() => {
-                                    location.reload();
-                                });                                
-                            })
-                            .catch(error => {
-                                console.error("Error:", error);
-                                Swal.fire({
-                                    icon: "error",
-                                    title: "Reject Failed!",
-                                    text: "There was an error rejecting the advance loan. Please try again.",
-                                });
-                            });
+                        // Use SweetAlert for confirmation
+                        Swal.fire({
+                            title: 'Confirm Rejection',
+                            text: 'Are you sure you want to reject the advance loan?',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#d33',
+                            cancelButtonColor: '#3085d6',
+                            confirmButtonText: 'Yes, reject it!'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Perform the rejection action here
+                                // You can add your logic for rejecting the advance loan
+                    
+                                fetch(`reject_advanceLoan_request/${advanceloanId}/`)
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP error! Status: ${response.status}`);
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        Swal.fire({
+                                            icon: "success",
+                                            title: "Advance Loan Rejected!",
+                                            html: `You have successfully rejected the advance loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
+                                        }).then(() => {
+                                            location.reload();
+                                        });
+                                    })
+                                    .catch(error => {
+                                        console.error("Error:", error);
+                                        Swal.fire({
+                                            icon: "error",
+                                            title: "Reject Failed!",
+                                            text: "There was an error rejecting the advance loan. Please try again.",
+                                        });
+                                    });
+                            }
+                        });
                     });
-
+                    
                     approveClonedLink.setAttribute("data-approveAdvanceLoan-url", `{% url "approve_advance_loan" loan_id=1 %}`.replace("1", advanceloanId));
                     approveLink.parentNode.replaceChild(approveClonedLink, approveLink);
 
                     approveClonedLink.addEventListener("click", function (event) {
                         event.preventDefault();
                         const url = approveClonedLink.getAttribute("data-approveAdvanceLoan-url");
-                        console.log(advanceloanId)
-
-                        fetch(`approve_advance_loan/${advanceloanId}/`)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! Status: ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                Swal.fire({
-                                    icon: "success",
-                                    title: "Advance Loan Approved!",
-                                    html: `You have successfully approved the advance loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
-                                }).then(() => {
-                                    location.reload();
-                                });
-                            })
-                            .catch(error => {
-                                console.error("Error:", error);
-                                Swal.fire({
-                                    icon: "error",
-                                    title: "Approval Failed!",
-                                    text: "There was an error approving the advance loan. Please try again.",
-                                });
-                            });
-                    });
-
+                        console.log(advanceloanId);
                     
+                        // Use SweetAlert for confirmation
+                        Swal.fire({
+                            title: 'Confirm Approval',
+                            text: 'Are you sure you want to approve the advance loan?',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Yes, approve it!'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Perform the approval action here
+                                // You can add your logic for approving the advance loan
+                    
+                                fetch(`approve_advance_loan/${advanceloanId}/`)
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP error! Status: ${response.status}`);
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        Swal.fire({
+                                            icon: "success",
+                                            title: "Advance Loan Approved!",
+                                            html: `You have successfully approved the advance loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
+                                        }).then(() => {
+                                            location.reload();
+                                        });
+                                    })
+                                    .catch(error => {
+                                        console.error("Error:", error);
+                                        Swal.fire({
+                                            icon: "error",
+                                            title: "Approval Failed!",
+                                            text: "There was an error approving the advance loan. Please try again.",
+                                        });
+                                    });
+                            }
+                        });
+                    });
+                                        
                     currentSectionadv = 0; 
                     sectionsadvs = document.querySelectorAll('.pending-approvaladv');
                     showSection(currentSectionadv);
@@ -768,15 +802,10 @@ document.addEventListener('DOMContentLoaded', function () {
             fetch(`get_welfareLoan_details/${welfareloanId}`)
                 .then(response => response.json())
                 .then(data => {
-                    // Log the data to the console
-                    console.log('Received data Welfare Loan Data:', data);
-
-                    // Log the inner HTML of the advancePopupContent div
-                    console.log('Current HTML of welfarePopupContent:', welfarePopupContent.innerHTML);
 
                     // Update the content of the popup with member details using textContent
                     welfarePopupContent.innerHTML = `
-                    <div class=" pending-approvalwel">
+                    <div class="pending-approvalwel">
                         <div class="my-details-tittle profile-tittle">
                             <p>General Details of Loan Applicant</p>
                         </div>
@@ -850,15 +879,18 @@ document.addEventListener('DOMContentLoaded', function () {
                                     <th>Status</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr>
-                                    <td>${data.guarantors[0].full_name}</td>
-                                    <td>${data.guarantors[0].member_number}</td>
-                                    <td>${data.guarantors[0].id_number}</td>
-                                    <td>${data.guarantors[0].phone_number}</td>
-                                    <td>${data.guarantors[0].loan_type_guaranteed}</td>
-                                    <td>${data.guarantors[0].signature_status}</td>
-                                </tr>
+                            <tbody id="guarantorsTableBody">
+                                <!-- Guarantors data will be inserted here using JavaScript -->
+                                ${data.guarantors.map(guarantor => `
+                                    <tr>
+                                        <td>${guarantor.full_name}</td>
+                                        <td>${guarantor.member_number}</td>
+                                        <td>${guarantor.id_number}</td>
+                                        <td>${guarantor.phone_number}</td>
+                                        <td>${guarantor.loan_type_guaranteed}</td>
+                                        <td>${guarantor.signature_status}</td>
+                                    </tr>
+                                `).join('')}
                             </tbody>
                         </table>    
                     </div>
@@ -965,66 +997,98 @@ document.addEventListener('DOMContentLoaded', function () {
                         event.preventDefault();
                         const url = rejectClonedLink.getAttribute("data-rejectWelfareLoan-url");
                     
-                        fetch(`reject_welfareLoan_request/${welfareloanId}/`)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! Status: ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                Swal.fire({
-                                    icon: "success",
-                                    title: "Welfare Loan Rejected!",
-                                    html: `You have successfully rejected the welfare loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
-                                }).then(() => {
-                                    location.reload();
-                                });                                
-                            })
-                            .catch(error => {
-                                console.error("Error:", error);
-                                Swal.fire({
-                                    icon: "error",
-                                    title: "Reject Failed!",
-                                    text: "There was an error rejecting the welfare loan. Please try again.",
-                                });
-                            });
+                        // Use SweetAlert for confirmation
+                        Swal.fire({
+                            title: 'Confirm Rejection',
+                            text: 'Are you sure you want to reject the welfare loan?',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#d33',
+                            cancelButtonColor: '#3085d6',
+                            confirmButtonText: 'Yes, reject it!'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Perform the rejection action here
+                                // You can add your logic for rejecting the welfare loan
+                    
+                                fetch(`reject_welfareLoan_request/${welfareloanId}/`)
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP error! Status: ${response.status}`);
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        Swal.fire({
+                                            icon: "success",
+                                            title: "Welfare Loan Rejected!",
+                                            html: `You have successfully rejected the welfare loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
+                                        }).then(() => {
+                                            location.reload();
+                                        });
+                                    })
+                                    .catch(error => {
+                                        console.error("Error:", error);
+                                        Swal.fire({
+                                            icon: "error",
+                                            title: "Reject Failed!",
+                                            text: "There was an error rejecting the welfare loan. Please try again.",
+                                        });
+                                    });
+                            }
+                        });
                     });
-
+                    
                     approveClonedLink.setAttribute("data-approveWelfareLoan-url", `{% url "approve_welfare_loan" loan_id=1 %}`.replace("1", welfareloanId));
                     approveLink.parentNode.replaceChild(approveClonedLink, approveLink);
 
                     approveClonedLink.addEventListener("click", function (event) {
                         event.preventDefault();
                         const url = approveClonedLink.getAttribute("data-approveWelfareLoan-url");
-                        console.log(welfareloanId)
-
-                        fetch(`approve_welfare_loan/${welfareloanId}/`)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! Status: ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                Swal.fire({
-                                    icon: "success",
-                                    title: "Welfare Loan Approved!",
-                                    html: `You have successfully approved the welfare loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
-                                }).then(() => {
-                                    location.reload();
-                                });
-                            })
-                            .catch(error => {
-                                console.error("Error:", error);
-                                Swal.fire({
-                                    icon: "error",
-                                    title: "Approval Failed!",
-                                    text: "There was an error approving the welfare loan. Please try again.",
-                                });
-                            });
+                        console.log(welfareloanId);
+                    
+                        // Use SweetAlert for confirmation
+                        Swal.fire({
+                            title: 'Confirm Approval',
+                            text: 'Are you sure you want to approve the welfare loan?',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Yes, approve it!'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Perform the approval action here
+                                // You can add your logic for approving the welfare loan
+                    
+                                fetch(`approve_welfare_loan/${welfareloanId}/`)
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP error! Status: ${response.status}`);
+                                        }
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        Swal.fire({
+                                            icon: "success",
+                                            title: "Welfare Loan Approved!",
+                                            html: `You have successfully approved the welfare loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
+                                        }).then(() => {
+                                            location.reload();
+                                        });
+                                    })
+                                    .catch(error => {
+                                        console.error("Error:", error);
+                                        Swal.fire({
+                                            icon: "error",
+                                            title: "Approval Failed!",
+                                            text: "There was an error approving the welfare loan. Please try again.",
+                                        });
+                                    });
+                            }
+                        });
                     });
-
+                    
                     currentSectionwel = 0; 
                     sectionswels = document.querySelectorAll('.pending-approvalwel');
                     showSection(currentSectionwel);
@@ -1414,7 +1478,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-//PVWG UPDATE CONTRIBUTIONS, SHARES, LOANS, BENEVOLENT.
+//PVWG UPDATE CONTRIBUTIONS, SHARES, BENEVOLENT AND LOANS.
 document.addEventListener('DOMContentLoaded', function () {
     const getPvwContributionButtons = document.getElementById('getPvwContributionButtons');
     const overlaypvwUpdate = document.getElementById('overlaypvwUpdate');
@@ -1427,6 +1491,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let currentSectionpvwUpdate = 0;
     let sectionspvwUpdate = [];
+
+    function showPreloader() {
+        // Display the preloader
+        document.getElementById('preloader').style.display = 'block';
+    
+        // Set a timeout to hide the preloader after 10 seconds
+        setTimeout(function() {
+          
+        }, 10000);  // 10000 milliseconds = 10 seconds
+    }
+    
+    function hidePreloader() {
+        // Hide the preloader by setting its display property to 'none'
+        document.getElementById('preloader').style.display = 'none';
+    }
+    
 
     function showSection(index) {
         sectionspvwUpdate.forEach((sectionpvwUpdate, i) => {
@@ -1468,186 +1548,325 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+
+    
     getPvwContributionButtons.addEventListener('click', function (event) {
         // Prevent the default behavior of the click event
         event.preventDefault();
     
-        // Send an AJAX request to get advance loan details
-        fetch(`get_member_details_for_pvwUpdateContributions/`)
-            .then(response => response.json())
-            .then(data => {
-                // Log the data to the console
-                console.log('Received data Benevolent Claim Data:', data);
+        showPreloader()
 
-                // Update the content of the popup with member details using textContent
-                pvwMonthlyUpdatePopupContent.innerHTML = `
-                    <div class="pending-approvalpvwUpdate">
-                        <div class="my-details-tittle profile-tittle">
-                            <p>Changes To be Updated On Shares</p>
-                        </div>
-                        <table class="tbl">
-                            <thead>
-                                <tr>
-                                    <th>Full Name</th>
-                                    <th>Member Number</th>
-                                    <th>Position</th>
-                                    <th>Shares Contribution Balance</th>
-                                    <th>Share Amount to Contribute</th>
-                                    <th>New Shares Contribution Balance</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.members.map(member => `
-                                    <tr>
-                                        <td>${member.full_name}</td>
-                                        <td>${member.member_number}</td>
-                                        <td>${member.position}</td>
-                                        <td>${member.shares_contribution_balance}</td>
-                                        <td>${member.share_amountTo_contribute}</td>
-                                        <td>${member.new_shares_contribution_balance}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table> 
-                    </div>
-    
-                    <div class="pending-approvalpvwUpdate">
-                        <div class="my-details-tittle profile-tittle">
-                            <p>Changes To be Updated On Benevolent</p>
-                        </div>
-                        <table class="tbl">
-                            <thead>
-                                <tr>
-                                    <th>Full Name</th>
-                                    <th>Member Number</th>
-                                    <th>Position</th>
-                                    <th>Benevolent Contribution Balance</th>
-                                    <th>Benevolent Amount to Contribute</th>
-                                    <th>New Benevolent Contribution Balance</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.members.map(member => `
-                                    <tr>
-                                        <td>${member.full_name}</td>
-                                        <td>${member.member_number}</td>
-                                        <td>${member.position}</td>
-                                        <td>${member.benevolent_contribution_balance}</td>
-                                        <td>${member.benevolent_amountTo_contribute}</td>
-                                        <td>${member.new_benevolent_contribution_balance}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table> 
-                    </div>    
+        // Simulate a minimum delay of 5 seconds with setTimeout
+        setTimeout(() => {
 
-                    <div class="pending-approvalpvwUpdate">
-                        <div class="my-details-tittle profile-tittle">
-                            <p>Welfare Revenue</p>
-                        </div>
-                        <div class="my-details-data">
-                            <div class="form-group">
-                                <label for="fulname">Welfare Income On Shares Contributed (Before Balance)</label>
-                                <input type="text" value="${data.overall_balances.total_welfare_shares_contribution_before}" readonly>
-                            </div> 
-                            <div class="form-group">
-                                <label for="fulname">Welfare Income On Benevolent Contributed (Before Balance)</label>
-                                <input type="text" value="${data.overall_balances.total_welfare_benovelent_contribution_before}" readonly>
+            // Send an AJAX request to get advance loan details
+            fetch(`get_member_details_for_pvwUpdateContributions/`)
+                .then(response => response.json())
+                .then(data => {
+                   
+                    // Update the content of the popup with member details using textContent
+                    pvwMonthlyUpdatePopupContent.innerHTML = `
+                        <div class="pending-approvalpvwUpdate">
+                            <div class="my-details-tittle profile-tittle">
+                                <p>Changes To be Updated On Shares</p>
                             </div>
-                            <div class="form-group">
-                                <label for="memberno">Welfare Income From Loan Interest (Before Balance)</label>
-                                <input type="text" value="${data.overall_balances.total_welfare_interest_before}" readonly>
-                            </div> 
+                            <table class="tbl">
+                                <thead>
+                                    <tr>
+                                        <th>Full Name</th>
+                                        <th>Member Number</th>
+                                        <th>Position</th>
+                                        <th>Shares Contribution Balance</th>
+                                        <th>Share Amount to Contribute</th>
+                                        <th>New Shares Contribution Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.members.map(member => `
+                                        <tr>
+                                            <td>${member.full_name}</td>
+                                            <td>${member.member_number}</td>
+                                            <td>${member.position}</td>
+                                            <td>${member.shares_contribution_balance}</td>
+                                            <td>${member.share_amountTo_contribute}</td>
+                                            <td>${member.new_shares_contribution_balance}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table> 
                         </div>
-                        <div class="my-details-data">
-                            <div class="form-group">
-                                <label for="fulname">Welfare Income On Shares Contributed (After Balance)</label>
-                                <input type="text" value="${data.overall_balances.total_welfare_shares_contribution_after}" readonly>
-                            </div> 
-                            <div class="form-group">
-                                <label for="fulname">Welfare Income On Benevolent Contributed (After Balance)</label>
-                                <input type="text" value="${data.overall_balances.total_welfare_benovelent_contribution_after}" readonly>
+        
+                        <div class="pending-approvalpvwUpdate">
+                            <div class="my-details-tittle profile-tittle">
+                                <p>Changes To be Updated On Benevolent</p>
                             </div>
-                            <div class="form-group">
-                                <label for="memberno">Welfare Income From Loan Interest (After Balance)</label>
-                                <input type="text" value="${data.overall_balances.total_welfare_interest_after}" readonly>
-                            </div> 
+                            <table class="tbl">
+                                <thead>
+                                    <tr>
+                                        <th>Full Name</th>
+                                        <th>Member Number</th>
+                                        <th>Position</th>
+                                        <th>Benevolent Contribution Balance</th>
+                                        <th>Benevolent Amount to Contribute</th>
+                                        <th>New Benevolent Contribution Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.members.map(member => `
+                                        <tr>
+                                            <td>${member.full_name}</td>
+                                            <td>${member.member_number}</td>
+                                            <td>${member.position}</td>
+                                            <td>${member.benevolent_contribution_balance}</td>
+                                            <td>${member.benevolent_amountTo_contribute}</td>
+                                            <td>${member.new_benevolent_contribution_balance}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table> 
+                        </div>    
+
+                        <div class="pending-approvalpvwUpdate">
+                            <div class="my-details-tittle profile-tittle">
+                                <p>Salary Advance Loan Due (REPAYMENTS)</p>
+                            </div>
+
+                            <table class="tbl">
+                                <thead>
+                                    <tr>
+                                        <th>Full Name</th>
+                                        <th>Member Number</th>
+                                        <th>Position</th>
+                                        <th>Loan ID</th>
+                                        <th>Loan Amount Borrowed</th>
+                                        <th>Interest</th>
+                                        <th>Loan Amount Due</th>
+                                        <th>Loan Due Date</th>
+                                        <th>Outstanding Loan Principal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Use a conditional check to display "No active salary advance loans" message -->
+                                    ${data.members.length > 0 ?
+                                        data.members.map(member => {
+                                            return member.advance_loans_due_repayments.map(loan => `
+                                                <tr>
+                                                    <td>${member.full_name}</td>
+                                                    <td>${member.member_number}</td>
+                                                    <td>${member.position}</td>
+                                                    <td>${loan.loan_id}</td>
+                                                    <td>${loan.loan_amount_borrowed}</td>
+                                                    <td>${loan.interest}</td>
+                                                    <td>${loan.amount_to_be_paid}</td>
+                                                    <td>${loan.due_date}</td>
+                                                    <td>${member.outstanding_balance_after_repayment}</td>
+                                                </tr>
+                                            `).join('');
+                                        }).join('')
+                                        :
+                                        `<tr>
+                                            <td colspan="6">No active salary advance loans</td>
+                                        </tr>`
+                                    }
+                                </tbody>
+                            </table> 
+
                         </div>
-                    </div>
 
-                `;
-                // Update contribution changes
-                const rejectLink = document.getElementById("rejectLinkpvwUpdate");
-                const approveLink = document.getElementById("approveLinkpvwUpdate");
+                        <div class="pending-approvalpvwUpdate">
+                            <div class="my-details-tittle profile-tittle">
+                                <p>Welfare Loan Installments  Due (REPAYMENTS)</p>
+                            </div>
+                            <table class="tbl">
+                                <thead>
+                                    <tr>
+                                        <th>Full Name</th>
+                                        <th>Member Number</th>
+                                        <th>Position</th>
+                                        <th>Loan ID</th>
+                                        <th>Loan Amount Borrowed</th>
+                                        <th>Installment</th>
+                                        <th>Interest</th>
+                                        <th>Amount Due</th>
+                                        <th>Installment Due Date</th>
+                                        <th>Outstanding Loan Principal</th>
+                                        <th>Months Remaining</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.members.map(member => `
+                                        ${member.welfare_loan_installment_due_repayments.map(welfareLoan => `
+                                            <tr>
+                                                <td>${member.full_name}</td>
+                                                <td>${member.member_number}</td>
+                                                <td>${member.position}</td>
+                                                <td>${welfareLoan.loan_id}</td>
+                                                <td>${welfareLoan.loan_amount_borrowed}</td>
+                                                <td>${welfareLoan.installment}</td>
+                                                <td>${welfareLoan.interest}</td>
+                                                <td>${welfareLoan.amount_due}</td>
+                                                <td>${welfareLoan.installment_due_date}</td>
+                                                <td>${welfareLoan.outstanding_loan_principal}</td>
+                                                <td>${welfareLoan.months_remaining}</td>
+                                            </tr>
+                                        `).join('')}
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div> 
+                        <div class="pending-approvalpvwUpdate">
+                            <div class="my-details-tittle profile-tittle">
+                                <p>Welfare Revenue</p>
+                            </div>
+                            <table class = "tbl">
+                                <thead>
+                                    <tr>
+                                        <th>Description</th>
+                                        <th>Before Balance</th>
+                                        <th>Gain Adjustment</th>
+                                        <th>After Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Welfare Income On Shares Contributed</td>
+                                        <td>${data.overall_balances.total_welfare_shares_contribution_before}</td>
+                                        <td>${data.overall_balances.total_welfare_shares_contribution_after - data.overall_balances.total_welfare_shares_contribution_before}</td>
+                                        <td>${data.overall_balances.total_welfare_shares_contribution_after}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Welfare Income On Benevolent Contributed</td>
+                                        <td>${data.overall_balances.total_welfare_benovelent_contribution_before}</td>
+                                        <td>${data.overall_balances.total_welfare_benovelent_contribution_after - data.overall_balances.total_welfare_benovelent_contribution_before}</td>
+                                        <td>${data.overall_balances.total_welfare_benovelent_contribution_after}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Welfare Income From Loan Interest</td>
+                                        <td>${data.overall_balances.total_welfare_interest_before}</td>
+                                        <td>${data.overall_balances.total_welfare_interest_after - data.overall_balances.total_welfare_interest_before}</td>
+                                        <td>${data.overall_balances.total_welfare_interest_after}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                    // Update contribution changes
+                    const rejectLink = document.getElementById("rejectLinkpvwUpdate");
+                    const approveLink = document.getElementById("approveLinkpvwUpdate");
 
-                rejectLink.addEventListener("click", function (event) {
-                    event.preventDefault();
+                    rejectLink.addEventListener("click", function (event) {
+                        event.preventDefault();
                     
-                    Swal.fire({
-                        icon: "success",
-                        title: "Revert Success!",
-                        html: `You have successfully reverted changes on contributions.`,
-                    }).then(() => {
-                        location.reload();
+                        // Use SweetAlert for confirmation
+                        Swal.fire({
+                            title: 'Confirm Revert',
+                            text: 'Are you sure you want to revert changes on contributions?',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Yes, revert it!'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Perform the revert action here
+                                // You can add your logic for reverting changes
+                    
+                                Swal.fire({
+                                    icon: "success",
+                                    title: "Revert Success!",
+                                    html: `You have successfully reverted changes on contributions.`,
+                                }).then(() => {
+                                    location.reload();
+                                });
+                            }
+                        });
                     });
                     
+                    approveLink.addEventListener("click", function (event) {
+                        event.preventDefault();
                     
-
-                })   
-
-                approveLink.addEventListener("click", function (event) {
-                    event.preventDefault();
-
-                    const url = approveLink.getAttribute("data-approvePvwMonthlyUpdate-url");
-
-                    // Fetch CSRF token from cookies
-                    function getCookie(name) {
-                        const value = `; ${document.cookie}`;
-                        const parts = value.split(`; ${name}=`);
-                        if (parts.length === 2) return parts.pop().split(';').shift();
+                        // Use SweetAlert for confirmation
+                        Swal.fire({
+                            title: 'Confirm Update',
+                            text: `Are you sure you want to update contributions for the end of the month (${getEndOfMonthDate()})?`,
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Yes, update it!'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                const url = approveLink.getAttribute("data-approvePvwMonthlyUpdate-url");
+                    
+                                // Fetch CSRF token from cookies
+                                function getCookie(name) {
+                                    const value = `; ${document.cookie}`;
+                                    const parts = value.split(`; ${name}=`);
+                                    if (parts.length === 2) return parts.pop().split(';').shift();
+                                }
+                    
+                                fetch(`approve_pvwMonthlyUpdate_Contributions/`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRFToken': getCookie('csrftoken'),
+                                    },
+                                })
+                                .then(response => {
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP error! Status: ${response.status}`);
+                                    }
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    Swal.fire({
+                                        icon: "success",
+                                        title: "Contributions Updated!",
+                                        html: `You have successfully updated <strong>${data.total_share_amount} KES </strong> shares, and <strong>${data.total_benevolent_amount} KES </strong> benevolent. New share balance <strong>${data.new_total_share_amount_balance} KES </strong> and new benevolent balance is <strong>${data.new_total_benevolent_amount_balance} KES </strong> .`,
+                                    }).then(() => {
+                                        location.reload();
+                                    });
+                                })
+                                .catch(error => {
+                                    console.error("Error:", error);
+                                    Swal.fire({
+                                        icon: "error",
+                                        title: "Approval Failed!",
+                                        text: "There was an error while updating the contributions. Please try again.",
+                                    });
+                                });
+                            }
+                        });
+                    });
+                    
+                    // Function to get the end of the month date formatted as DD-MM-YYYY
+                    function getEndOfMonthDate() {
+                        const currentDate = new Date();
+                        const endOfMonthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+                        
+                        const day = endOfMonthDate.getDate();
+                        const month = endOfMonthDate.getMonth() + 1;
+                        const year = endOfMonthDate.getFullYear();
+                        
+                        return `${day}-${month < 10 ? '0' : ''}${month}-${year}`;
                     }
+                    
+                    currentSectionpvwUpdate = 0;
+                    sectionspvwUpdate = document.querySelectorAll('.pending-approvalpvwUpdate');
+                    showSection(currentSectionpvwUpdate);
+                    overlaypvwUpdate.style.display = 'flex';
 
-                    fetch(`approve_pvwMonthlyUpdate_Contributions/`, {
-                        method: 'POST',  
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCookie('csrftoken'),  
-                        },
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! Status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        Swal.fire({
-                            icon: "success",
-                            title: "Contributions Updated!",
-                            html: `You have successfully updated <strong>${data.total_share_amount} KES </strong> shares, and <strong>${data.total_benevolent_amount} KES </strong> benevolent. New share balance <strong>${data.new_total_share_amount_balance} KES </strong> and new benevolent balance is <strong>${data.new_total_benevolent_amount_balance} KES </strong> .`,
-                        }).then(() => {
-                            location.reload();
-                        });
-                    })
-                    .catch(error => {
-                        console.error("Error:", error);
-                        Swal.fire({
-                            icon: "error",
-                            title: "Approval Failed!",
-                            text: "There was an error while updating the contributions. Please try again.",
-                        });
-                    });
-                });
-                
-                currentSectionpvwUpdate = 0;
-                sectionspvwUpdate = document.querySelectorAll('.pending-approvalpvwUpdate');
-                showSection(currentSectionpvwUpdate);
-                overlaypvwUpdate.style.display = 'flex';
-            })
-            .catch(error => console.error('Error fetching advance loan details:', error));
+                    // Hide the preloader after the data is fetched
+                    hidePreloader();
+                })
+                .catch(error => console.error('Error fetching advance loan details:', error));
+                // Hide the preloader in case of an error
+                hidePreloader();
+
+        }, 5000); // 5000 milliseconds (5 seconds) delay
     });
+   
     
-
     popupCloseButtonpvwUpdate.addEventListener('click', function () {
         overlaypvwUpdate.style.display = 'none';
     });

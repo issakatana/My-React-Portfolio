@@ -8,11 +8,14 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from authentication.models import CustomUser, Member, PersonalDetails, ContactDetails, Nominee, NextOfKin
-from backOffice.models import Transaction, AdjustedShareContributions, Benovelent, BenevolentClaim, AdvanceLoan, WelfareLoan, ReducingTable, Payroll, DeceasedInformation, WelfareStatistics
+from backOffice.models import Transaction, AdjustedShareContributions, Benovelent, BenevolentClaim, AdvanceLoan, WelfareLoan, ReducingTable, Guarantor, Payroll, DeceasedInformation, WelfareStatistics
 from django.http import HttpResponse, HttpResponseForbidden, HttpResponseServerError, JsonResponse
 from django.db import transaction
 import logging
 from django.db.models import Q
+from django.db.models import Sum
+from typing import Optional
+from decimal import Decimal
 
 
 ################# ADMIN DASHBOARD PAGE VIEWS ###############
@@ -76,8 +79,10 @@ def admindashboard(request):
             'unapproved_accounts_count' : unapproved_accounts_count,
             'approved_accounts_count': approved_accounts_count,
 
+           'welfare_income_from_new_acccounts_registration_balance': format(welfare_statistics.welfare_new_acccounts_reg, ','),  
            'welfare_shares_balance': format(welfare_statistics.welfare_shares_balance, ','),
            'welfare_benevolent_balance': format(welfare_statistics.welfare_benevolent_balance, ','),
+           'welfare_loanInterest_balance': format(welfare_statistics.welfare_loanInterest_balance, ','),
 
             'benovelent_sum': benovelent_sum,
             'shares_sum': shares_sum,
@@ -96,176 +101,292 @@ def admindashboard(request):
  
 
 
-def pvwUpdateContributions(request):
+# --------------------- PVW UPDATE CONTRIBUTIONS MONTHLY START------------------------ #
+@login_required
+@user_passes_test(is_superuser)
+def approve_pvwMonthlyUpdate_Contributions(request):
     try:
         with transaction.atomic():
-            members_data = Member.objects.all()
+            if request.method == 'POST':
 
-            for member in members_data:
-                repaid_advance_amount, repaid_advance_interest = 0, 0
+                total_share_amount = 0
+                total_benevolent_amount = 0
 
-                # Check if the member has a Benovelent and Shares instance
-                if hasattr(member, 'benovelent') and hasattr(member, 'share_amount'):
-                    benovelent_contribution = member.benovelent.benov_amount
-                    share_contribution = member.share_amount.share_amount
+                total_advanceLoan_interest = 0
+                total_advanceLoan_principal = 0 
 
-                    print(benovelent_contribution)
-                    print(share_contribution)
+                total_welfareLoan_interest = 0
+                total_welfareLoan_principal = 0 
 
-                    # Process advance loans
-                    advance_loan_instances = AdvanceLoan.objects.filter(
+
+
+                # Exclude staff, superusers and filter only approved members
+                members_data = Member.objects.filter(
+                    user__is_staff=False,
+                    user__is_superuser=False,
+                    user__is_approved=True,
+                    user__status='Approved'
+                )
+
+                # Update Share and Benevolent balance for each approved member
+                for member in members_data:
+                    if hasattr(member, 'benovelent') and hasattr(member, 'share_amount'):
+
+                        share_contribution = member.share_amount.share_amount
+                        benovelent_contribution = member.benovelent.benov_amount
+                       
+                        member.update_shares_contribution(share_contribution)
+                        member.update_benovelent_contribution(benovelent_contribution)
+                        member.update_welfare()
+
+                        # Share transaction record for each approved member
+                        Transaction.objects.create(
+                            member=member,
+                            activity_type='shares',
+                            description="Shares Contribution Update",
+                            debit=0,
+                            credit=share_contribution,
+                        )
+
+                        # Accumulate share_contribution value
+                        total_share_amount += share_contribution
+
+                        # Benevolent transaction record for each approved member
+                        Transaction.objects.create(
+                            member=member,
+                            activity_type='benovelent',
+                            description="Benovelent Contribution Update",
+                            debit=0,
+                            credit=benovelent_contribution,
+                        )
+
+                        # Accumulate benovelent_contribution value
+                        total_benevolent_amount += benovelent_contribution
+
+                # Process matured advance loans if any    
+                for member in members_data:
+                    # Fetch AdvanceLoans where is_repaid is False and amount_to_be_paid is greater than zero
+                    advance_loans_due = AdvanceLoan.objects.filter(
                         member=member,
+                        is_repaid=False,
+                        status="approved",
                         is_disbursed=True,
-                        is_repaid=False
+                        amount_to_be_paid__gt=0
                     )
 
-                    if advance_loan_instances.exists():
-                        for advance_loan_instance in advance_loan_instances:
-                            repaid_advance_amount = advance_loan_instance.borrowed_amount
-                            repaid_advance_interest = advance_loan_instance.interest
+                    if advance_loans_due.exists():
+
+                        # Calculate total amount_to_be_paid for all loans in advance_loans_due
+                        total_amount_to_be_paid = sum(loan.amount_to_be_paid for loan in advance_loans_due)
+
+                        # Calculate 'Outstanding Balance(After Repayment)' by subtracting the sum of salary_advance_loan and salary_advance_loan_interest
+                        outstanding_balance_after_repayment = (member.salary_advance_loan + member.salary_advance_loan_interest) - total_amount_to_be_paid
+
+                        # Update salary_advance_loan and salary_advance_loan_interest with outstanding_balance_after_repayment
+                        member.salary_advance_loan = outstanding_balance_after_repayment if outstanding_balance_after_repayment > 0 else 0
+                        member.salary_advance_loan_interest = 0 
+                        member.save()
+
+                        # Update is_repaid to True for each loan in advance_loans_due
+                        for loan in advance_loans_due:
+                            loan.approve_loan_repaid()
+                            loan.status = "Cleared"
+                            loan.save()
+
+                            # Update 'guaranteed_repaid' for guarantors associated with the cleared loan
+                            guarantors = Guarantor.objects.filter(advance_loan=loan)
+                            for guarantor in guarantors:
+                                guarantor.guaranteed_repaid = True
+                                guarantor.signature_status = "Cleared"
+                                guarantor.save()
+
+                            # Create transaction records for loan interest 
+                            Transaction.objects.create(
+                                member=member,
+                                activity_type='loan_interest',
+                                description=f"Loan Interest Payment - {loan.loan_id}",
+                                debit=loan.interest,
+                                credit=0,
+                            )
+
+                            # Accumulate loan.interest value
+                            total_advanceLoan_interest += loan.interest
+
+                            # Create transaction records for loan principal
+                            Transaction.objects.create(
+                                member=member,
+                                activity_type='loan_principal',
+                                description=f"Loan Principal Payment - {loan.loan_id}",
+                                debit=loan.borrowed_amount,
+                                credit=0,
+                            )
+
+                            # Accumulate borrowed_amount(loan principal) value
+                            total_advanceLoan_principal += loan.borrowed_amount
+
+                            # Update payroll model and loan_wf from reducing table
+                            payroll_instance, created = Payroll.objects.get_or_create(member=member)
+                            payroll_instance.advance = float(loan.amount_to_be_paid)
+                            payroll_instance.save()
+
                     else:
-                        print("No matching AdvanceLoan instances found.")
+                        payroll_instance, created = Payroll.objects.get_or_create(member=member)
+                        payroll_instance.advance = 0
+                        payroll_instance.save() 
 
-                    if repaid_advance_amount > 0:
-                        member.clear_salary_advance_loan()
-                        advance_loan_instance.approve_loan_repaid()
 
-                        Transaction.objects.create(
-                            member=member,
-                            activity_type='advance loan repayment',
-                            description="Advance Loan Repaid Successfully",
-                            debit=repaid_advance_amount,
-                            credit=0,
-                        )
+                # Process matured welfare loans if any
+                for member in members_data:
+                    welfare_loan_repayments = []
 
-                        Transaction.objects.create(
-                            member=member,
-                            activity_type='advance loan interest',
-                            description="Advance Loan interest on repayment",
-                            debit=repaid_advance_interest,
-                            credit=0,
-                        )
-
-                    # Process welfare loans
+                    # Fetch Welfare Loans where is_repaid is False and amount_to_be_paid is greater than zero        
                     welfare_loan_instances = WelfareLoan.objects.filter(
                         member=member,
                         is_disbursed=True,
-                        is_repaid=False
-                    )
+                        status="approved",
+                        is_repaid=False,
+                        loan_amount_to_be_paid__gt=0
+                    )   
 
-                    for welfare_loan_instance in welfare_loan_instances:
-                        reducing_table_entries = welfare_loan_instance.reducing_table.filter(
-                            is_picked=False,
-                            date_picked=None
-                        ).order_by('month')[:1]
+                    if welfare_loan_instances.exists():  
 
-                        if reducing_table_entries.exists():
-                            reducing_entry = reducing_table_entries[0]
-                            reducing_entry.is_picked = True
-                            reducing_entry.date_picked = timezone.now().date()
-                            reducing_entry.status = 'picked'
-                            reducing_entry.save()
+                        for welfare_loan_instance in welfare_loan_instances:
+                            reducing_table_entries = welfare_loan_instance.reducing_table.filter(
+                                is_picked=False,
+                                date_picked=None
+                            ).order_by('month')[:1]
 
-                            member.deduct_from_normal_loan(reducing_entry.installment, reducing_entry.interest)
+                            if reducing_table_entries.exists():
+                                reducing_entry = reducing_table_entries[0]
+                                welfare_loan_repayments.append({
+                                    'loan_id': welfare_loan_instance.loan_id,
+                                    'loan_amount_borrowed': welfare_loan_instance.borrowed_amount,
+                                    'installment': float(reducing_entry.installment),
+                                    'interest': float(reducing_entry.interest),
+                                    'amount_due': float(reducing_entry.amount_due),
+                                    'installment_due_date': reducing_entry.installment_maturity_date,
+                                    'outstanding_loan_principal': reducing_entry.outstanding_loan_principal,
+                                    'months_remaining': reducing_entry.months_remaining
+                                })
 
-                            payroll_instance, created = Payroll.objects.get_or_create(member=member)
-                            payroll_instance.update_loan_wf_from_reducing_table(welfare_loan_instance)
+                                # Create transaction records for loan interest
+                                Transaction.objects.create(
+                                    member=member,
+                                    activity_type='loan_interest',
+                                    description=f"Welfare Loan Interest Payment - {welfare_loan_instance.loan_id}",
+                                    debit=float(reducing_entry.interest),
+                                    credit=0,
+                                )
 
-                            print(f"Reducing Table Entry picked for Welfare Loan {welfare_loan_instance.loan_id}")
-                        else:
-                            print(f"No suitable reducing table entry found for Welfare Loan {welfare_loan_instance.loan_id}")
-                            payroll_instance, created = Payroll.objects.get_or_create(member=member)
-                            payroll_instance.loan_wf = 0
-                            payroll_instance.save()
+                                # Accumulate the interest
+                                total_welfareLoan_interest += float(reducing_entry.interest)
 
-                    # Update contributions for the member
-                    member.update_benovelent_contribution(benovelent_contribution)
-                    member.update_shares_contribution(share_contribution)
-                    member.update_welfare()
+                                # Create transaction records for loan principal
+                                Transaction.objects.create(
+                                    member=member,
+                                    activity_type='loan_principal',
+                                    description=f"Welfare Loan Principal Payment - {welfare_loan_instance.loan_id}",
+                                    debit=float(reducing_entry.amount_due - reducing_entry.interest),
+                                    credit=0,
+                                )
 
-                    # Create or update Payroll record
+                                # Accumulate the principal
+                                total_welfareLoan_principal += float(reducing_entry.amount_due - reducing_entry.interest)
+
+                                # update reducing table
+                                reducing_entry.is_picked = True
+                                reducing_entry.date_picked = timezone.now().date()
+                                reducing_entry.status = 'Cleared'
+                                reducing_entry.save()  
+
+                                # Check if the loan is fully cleared
+                                if not WelfareLoan.objects.filter(loan_id=welfare_loan_instance.loan_id, reducing_table__is_picked=False).exists():
+                                    # Set status to Cleared and is_repaid to True
+                                    welfare_loan_instance.status = 'Cleared'
+                                    welfare_loan_instance.is_repaid = True
+                                    welfare_loan_instance.date_repaid = timezone.now().date()
+                                    welfare_loan_instance.save()
+
+                                    # Update guarantor status when the loan is cleared
+                                    for guarantor in welfare_loan_instance.get_guarantors():
+                                        guarantor.guaranteed_repaid = True
+                                        guarantor.signature_status = "Cleared"
+                                        guarantor.save()    
+                            
+                                # Update payroll model and loan_wf from reducing table
+                                payroll_instance, created = Payroll.objects.get_or_create(member=member)
+                                payroll_instance.loan_wf = float(reducing_entry.amount_due)
+                                payroll_instance.save()
+
+                                # Update member balances
+                                member.deduct_from_normal_loan(reducing_entry.installment, reducing_entry.interest)
+                            
+                            else:
+                                # print(f"No suitable reducing table entry found for Welfare Loan {welfare_loan_instance.loan_id}")
+                                payroll_instance, created = Payroll.objects.get_or_create(member=member)
+                                payroll_instance.loan_wf = 0
+                                payroll_instance.save()    
+
+                # Create or update Payroll record for all members outside the loop
+                for member in members_data:
                     payroll, created = Payroll.objects.get_or_create(member=member)
                     payroll.full_name = member.personal_details.get_full_name()
-                    payroll.welfare = share_contribution
-                    payroll.benovelent = benovelent_contribution
-                    payroll.advance = repaid_advance_amount + repaid_advance_interest
+                    payroll.welfare = share_contribution  
+                    payroll.benovelent = benovelent_contribution  
                     payroll.save()
 
-                    # Create transaction records
-                    Transaction.objects.create(
-                        member=member,
-                        activity_type='benovelent',
-                        description="Benovelent Contribution Update",
-                        debit=0,
-                        credit=benovelent_contribution,
-                    )
+                # Retrieve or create an instance of WelfareStatistics
+                welfare_statistics, created = WelfareStatistics.objects.get_or_create(pk=1)
 
-                    Transaction.objects.create(
-                        member=member,
-                        activity_type='shares',
-                        description="Shares Contribution Update",
-                        debit=0,
-                        credit=share_contribution,
-                    )
+                # Update welfare_statistics balances
+                welfare_statistics.welfare_shares_balance += total_share_amount
+                welfare_statistics.welfare_benevolent_balance += total_benevolent_amount
 
-                else:
-                    print(f"No Benovelent instance found for Member {member.user.member_number}")
+                # Calculate total loan interest for all members
+                total_loan_interest = Decimal(str(total_advanceLoan_interest)) + Decimal(str(total_welfareLoan_interest))
 
-            return redirect('admindashboard')
+                welfare_statistics.welfare_loanInterest_balance += Decimal(str(total_loan_interest))
+
+                # Call the update_welfare_balances method
+                welfare_statistics.update_welfare_balances(
+                    welfare_statistics.welfare_shares_balance,
+                    welfare_statistics.welfare_benevolent_balance,
+                    welfare_statistics.welfare_loanInterest_balance
+                ) 
+
+                return JsonResponse({
+                    'success': 'Successfully approved Welfare Loan.',
+                    'total_share_amount': format(total_share_amount, ','),
+                    'total_benevolent_amount': format(total_benevolent_amount, ','),
+                    'new_total_share_amount_balance': format(welfare_statistics.welfare_shares_balance, ','),
+                    'new_total_benevolent_amount_balance': format(welfare_statistics.welfare_benevolent_balance, ','),
+                })
+
+            else:
+                return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    except Member.DoesNotExist:
+        return JsonResponse({'error': 'Member not found'}, status=404)
 
     except Exception as e:
-        return HttpResponseServerError(f"An error occurred: {str(e)}")
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
+# [Errno 11001] getaddrinfo failed
+# Internal Server Error: /save_form_data/
+# [13/Jan/2024 20:57:22] "POST /save_form_data/ HTTP/1.1" 500 55
 
+# ---------------------PVW UPDATE CONTRIBUTIONS MONTHLY END ------------------------ #
 
-
-
-
-
-# def get_member_details_for_pvwUpdateContributions(request):
-#     try:
-#         members = Member.objects.all()
-        
-#         member_details_list = []
-#         for member in members:
-#             member_details = {
-#                 # General Details
-#                 'full_name': member.personal_details.get_full_name() or 'No data provided',
-#                 'member_number': member.user.member_number or 'No data provided',
-#                 'position': member.personal_details.position or 'No data provided',
-
-#                 # Share Details
-#                 'shares_contribution_balance': member.shares_contribution or 'No data provided',
-#                 'share_amountTo_contribute': member.share_amount.share_amount or 'No data provided',
-#                 'new_shares_contribution_balance': member.shares_contribution + member.share_amount.share_amount,
-
-#                 # Benevolent Details
-#                 'benevolent_contribution_balance': member.benovelent_contribution or 'No data provided',
-#                 'benevolent_amountTo_contribute': member.benovelent.benov_amount or 'No data provided',
-#                 'new_benevolent_contribution_balance': member.benovelent_contribution + member.benovelent.benov_amount,
-
-#                 # Before Balances
-#                 'total_welfare_shares_contribution_before': 0,
-#                 'total_welfare_benovelent_contribution_before': 0,
-#                 'total_welfare_interest_before': 0,
-
-#                 # After Balances
-#                 'total_welfare_shares_contribution_after': 0,
-#                 'total_welfare_benovelent_contribution_after': 0,
-#                 'total_welfare_interest_after': 0
-#             }
-#             member_details_list.append(member_details)
-        
-#         return JsonResponse({'members': member_details_list})
-#     except Member.DoesNotExist:
-#         return JsonResponse({'error': 'Members not found'}, status=404)
-
-
-from django.db.models import Sum
 
 def get_member_details_for_pvwUpdateContributions(request):
     try:
-        members = Member.objects.all()
+        # Exclude staff and superusers, and filter only approved members
+        members = Member.objects.filter(
+            user__is_staff=False,
+            user__is_superuser=False,
+            user__is_approved=True,
+            user__status='Approved'
+        )
 
         # Calculate total share and benevolent contributions
         total_share_amount = members.aggregate(total_share_amount=Sum('share_amount__share_amount'))['total_share_amount'] or 0
@@ -273,13 +394,33 @@ def get_member_details_for_pvwUpdateContributions(request):
 
         # Collect member details
         member_details_list = []
+        total_welfareLoan_interest = 0
 
         for member in members:
+            # Fetch personal details directly from PersonalDetails model
+            personal_details = PersonalDetails.objects.get(member=member)
+
+            # Fetch AdvanceLoans where is_repaid is False and amount_to_be_paid is greater than zero
+            advance_loans_due = AdvanceLoan.objects.filter(
+                member=member,
+                is_repaid=False,
+                status="approved",
+                is_disbursed=True,
+                amount_to_be_paid__gt=0
+            )
+
+            # Calculate total amount_to_be_paid for all loans in advance_loans_due
+            total_amount_to_be_paid = sum(loan.amount_to_be_paid for loan in advance_loans_due)
+
+            # Calculate 'Outstanding Balance(After Repayment)' by subtracting the sum of salary_advance_loan and salary_advance_loan_interest
+            outstanding_balance_after_repayment = (member.salary_advance_loan + member.salary_advance_loan_interest) - total_amount_to_be_paid
+
             member_details = {
+
                 # General Details
-                'full_name': member.personal_details.get_full_name() or 'No data provided',
+                'full_name': personal_details.get_full_name() or 'No data provided',
                 'member_number': member.user.member_number or 'No data provided',
-                'position': member.personal_details.position or 'No data provided',
+                'position': personal_details.position or 'No data provided',
 
                 # Share Details
                 'shares_contribution_balance': member.shares_contribution or 'No data provided',
@@ -290,15 +431,73 @@ def get_member_details_for_pvwUpdateContributions(request):
                 'benevolent_contribution_balance': member.benovelent_contribution or 'No data provided',
                 'benevolent_amountTo_contribute': member.benovelent.benov_amount or 'No data provided',
                 'new_benevolent_contribution_balance': member.benovelent_contribution + member.benovelent.benov_amount,
+
+                # Salary Advance Loan Due (REPAYMENTS)
+                'advance_loans_due_repayments': [
+                    {
+                        'loan_id': advance_loan.loan_id,
+                        'loan_amount_borrowed': float(advance_loan.borrowed_amount),
+                        'interest' : float(advance_loan.interest),
+                        'amount_to_be_paid' :  float(advance_loan.amount_to_be_paid),
+                        'due_date' : advance_loan.maturity_date,
+                    }
+                    for advance_loan in advance_loans_due
+                ],
+
+                # Welfare Loan Installment Due (REPAYMENTS)
+                'welfare_loan_installment_due_repayments': get_welfare_loan_repayments(member),
+
+                # Include 'Outstanding Balance(After Repayment)' in member details
+                'outstanding_balance_after_repayment': float(outstanding_balance_after_repayment),
+
             }
+
+            welfare_loan_repayments = []
+
+            welfare_loan_instances = WelfareLoan.objects.filter(
+                member=member,
+                is_disbursed=True,
+                status="approved",
+                is_repaid=False,
+                loan_amount_to_be_paid__gt=0
+            )
+
+            for welfare_loan_instance in welfare_loan_instances:
+                reducing_table_entries = welfare_loan_instance.reducing_table.filter(
+                    is_picked=False,
+                    date_picked=None
+                ).order_by('month')[:1]
+
+                if reducing_table_entries.exists():
+                    reducing_entry = reducing_table_entries[0]
+                    welfare_loan_repayments.append({
+                        'loan_id': welfare_loan_instance.loan_id,
+                        'loan_amount_borrowed': welfare_loan_instance.borrowed_amount,
+                        'installment': float(reducing_entry.installment),
+                        'interest': float(reducing_entry.interest),
+                        'amount_due': float(reducing_entry.amount_due),
+                        'installment_due_date': reducing_entry.installment_maturity_date,
+                        'outstanding_loan_principal': reducing_entry.outstanding_loan_principal,
+                        'months_remaining': reducing_entry.months_remaining
+                    })
+
+                    # Accumulate the interest
+                    total_welfareLoan_interest += float(reducing_entry.interest)
 
             member_details_list.append(member_details)
 
         # Check if WelfareStatistics instance exists
         welfare_statistics = WelfareStatistics.objects.first()
 
+        # Calculate total loan interest for all members
+        total_advanceLoan_interest = sum(get_advance_loan_interest(repayment['loan_id']) for member_details in member_details_list
+                          for repayment in member_details['advance_loans_due_repayments'])
+        
+        # Calculate total welfare loan interest for the member
+        total_loan_interest = Decimal(str(total_advanceLoan_interest)) + Decimal(str(total_welfareLoan_interest))
+
         # Use the model method to calculate overall balances
-        overall_balances = welfare_statistics.calculate_overall_balances(total_share_amount, total_benevolent_amount) if welfare_statistics else {
+        overall_balances = welfare_statistics.calculate_overall_balances(total_share_amount, total_benevolent_amount, total_loan_interest) if welfare_statistics else {
             'total_welfare_shares_contribution_before': 0,
             'total_welfare_benovelent_contribution_before': 0,
             'total_welfare_interest_before': 0,
@@ -307,84 +506,160 @@ def get_member_details_for_pvwUpdateContributions(request):
             'total_welfare_interest_after': 0,
         }
 
-        return JsonResponse({'members': member_details_list, 'overall_balances': overall_balances})
+        # Print advance_loans_due_repayments for each member on the server
+        # for member_details in member_details_list:
+        #     for repayment in member_details['advance_loans_due_repayments']:
+        #         loan_id = repayment['loan_id']
+        #         amount_to_be_paid = repayment['amount_to_be_paid']
+        #         loan_interest = get_advance_loan_interest(loan_id)
+        #         print(f"  Loan ID: {loan_id}, Amount to be Paid: {amount_to_be_paid}, Interest: {loan_interest}")
+
+        return JsonResponse({
+            'members': member_details_list,
+            'advance_loans_due_repayments': [
+                {
+                    'full_name': member_details['full_name'],
+                    'advance_loans_due_repayments': member_details['advance_loans_due_repayments'],
+                }
+                for member_details in member_details_list
+            ],
+            'overall_balances': overall_balances,
+            })
     
     except Member.DoesNotExist:
         return JsonResponse({'error': 'Members not found'}, status=404)
+    except PersonalDetails.DoesNotExist:
+        return JsonResponse({'error': 'PersonalDetails not found'}, status=404)
 
-from typing import Optional
 
 
-
-def approve_pvwMonthlyUpdate_Contributions(request):
+# View to calculate the total advance loan interest picked
+def get_advance_loan_interest(loan_id):
     try:
-        with transaction.atomic():
-            members_data = Member.objects.all()
-            total_share_amount = 0
-            total_benevolent_amount = 0
+        # Assuming 'loan_id' is a unique field in your AdvanceLoan model
+        advance_loan = AdvanceLoan.objects.get(loan_id=loan_id)
+        return advance_loan.interest
+    except AdvanceLoan.DoesNotExist:
+        return 'No data provided'
 
-            if request.method == 'POST':
-                if request.user.is_staff and request.user.status == "Approved":
-                    for member in members_data:
-                        member_status = member.user.status
-                        
-                        if member_status == "Approved":
-                            # Update contributions for the member
-                            member.update_benovelent_contribution(member.benovelent.benov_amount)
-                            member.update_shares_contribution(member.share_amount.share_amount)
-                            member.update_welfare()                           
 
-                            # Create transaction records
-                            Transaction.objects.create(
-                                member=member,
-                                activity_type='benovelent',
-                                description="Benovelent Contribution Update",
-                                debit=0,
-                                credit=member.benovelent.benov_amount,
-                            )
 
-                            Transaction.objects.create(
-                                member=member,
-                                activity_type='shares',
-                                description="Shares Contribution Update",
-                                debit=0,
-                                credit=member.share_amount.share_amount,
-                            )
 
-                            # Update total share and benevolent amounts
-                            total_share_amount += member.share_amount.share_amount
-                            total_benevolent_amount += member.benovelent.benov_amount
 
-                    # Retrieve or create an instance of WelfareStatistics
-                    welfare_statistics, created = WelfareStatistics.objects.get_or_create(pk=1)
 
-                    # Update welfare_statistics balances
-                    welfare_statistics.welfare_shares_balance += total_share_amount
-                    welfare_statistics.welfare_benevolent_balance += total_benevolent_amount
+def get_welfare_loan_repayments(member):
+    """Fetches welfare loan repayment details for a member."""
 
-                    # Call the update_welfare_balances method
-                    welfare_statistics.update_welfare_balances(
-                        welfare_statistics.welfare_shares_balance,
-                        welfare_statistics.welfare_benevolent_balance
-                    )
+    welfare_loan_repayments = []
 
-                    return JsonResponse({
-                        'success': f'Successfully approved Welfare Loan.',
-                        'total_share_amount': format(total_share_amount, ','),
-                        'total_benevolent_amount': format(total_benevolent_amount, ','),
-                        'new_total_share_amount_balance': format(welfare_statistics.welfare_shares_balance, ','),
-                        'new_total_benevolent_amount_balance': format(welfare_statistics.welfare_benevolent_balance, ','),
-                    })
-                else:
-                    return JsonResponse({'error': 'Update not found or is already updated'}, status=400)
-            else:
-                return JsonResponse({'error': 'Method not allowed'}, status=405)
+    welfare_loan_instances = WelfareLoan.objects.filter(
+        member=member,
+        is_disbursed=True,
+        status="approved",
+        is_repaid=False,
+        loan_amount_to_be_paid__gt=0
+    )
 
-    except Member.DoesNotExist:
-        return JsonResponse({'error': 'Member not found'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+    for welfare_loan_instance in welfare_loan_instances:
+        reducing_table_entries = welfare_loan_instance.reducing_table.filter(
+            is_picked=False,
+            date_picked=None
+        ).order_by('month')[:1]
 
+        if reducing_table_entries.exists():
+            reducing_entry = reducing_table_entries[0]
+            welfare_loan_repayments.append({
+                'loan_id': welfare_loan_instance.loan_id,
+                'loan_amount_borrowed': welfare_loan_instance.borrowed_amount,
+                'installment': float(reducing_entry.installment),
+                'interest': float(reducing_entry.interest),
+                'amount_due': float(reducing_entry.amount_due),
+                'installment_due_date': reducing_entry.installment_maturity_date,
+                'outstanding_loan_principal': reducing_entry.outstanding_loan_principal,
+                'months_remaining': reducing_entry.months_remaining
+            })
+
+    return welfare_loan_repayments
+
+
+
+def pvwUpdateContributions(request):
+    return redirect('admindashboard')
+
+
+# def approve_pvwMonthlyUpdate_Contributions(request):
+#     try:
+#         with transaction.atomic():
+#             # Exclude staff and superusers and filter only approved members
+#             members_data = Member.objects.filter(
+#                 user__is_staff=False,
+#                 user__is_superuser=False,
+#                 user__is_approved=True,
+#                 user__status='Approved'
+#             )
+
+#             total_share_amount = 0
+#             total_benevolent_amount = 0
+
+#             if request.method == 'POST':
+#                 if request.user.is_staff and request.user.status == "Approved":
+#                     for member in members_data:
+#                         # Update contributions for the member
+#                         member.update_benovelent_contribution(member.benovelent.benov_amount)
+#                         member.update_shares_contribution(member.share_amount.share_amount)
+#                         member.update_welfare()                           
+
+#                         # Create transaction records
+#                         Transaction.objects.create(
+#                             member=member,
+#                             activity_type='benovelent',
+#                             description="Benovelent Contribution Update",
+#                             debit=0,
+#                             credit=member.benovelent.benov_amount,
+#                         )
+
+#                         Transaction.objects.create(
+#                             member=member,
+#                             activity_type='shares',
+#                             description="Shares Contribution Update",
+#                             debit=0,
+#                             credit=member.share_amount.share_amount,
+#                         )
+
+#                         # Update total share and benevolent amounts
+#                         total_share_amount += member.share_amount.share_amount
+#                         total_benevolent_amount += member.benovelent.benov_amount
+
+#                     # Retrieve or create an instance of WelfareStatistics
+#                     welfare_statistics, created = WelfareStatistics.objects.get_or_create(pk=1)
+
+#                     # Update welfare_statistics balances
+#                     welfare_statistics.welfare_shares_balance += total_share_amount
+#                     welfare_statistics.welfare_benevolent_balance += total_benevolent_amount
+
+#                     # Call the update_welfare_balances method
+#                     welfare_statistics.update_welfare_balances(
+#                         welfare_statistics.welfare_shares_balance,
+#                         welfare_statistics.welfare_benevolent_balance
+#                     )
+
+#                     return JsonResponse({
+#                         'success': f'Successfully approved Welfare Loan.',
+#                         'total_share_amount': format(total_share_amount, ','),
+#                         'total_benevolent_amount': format(total_benevolent_amount, ','),
+#                         'new_total_share_amount_balance': format(welfare_statistics.welfare_shares_balance, ','),
+#                         'new_total_benevolent_amount_balance': format(welfare_statistics.welfare_benevolent_balance, ','),
+#                     })
+#                 else:
+#                     return JsonResponse({'error': 'Update not found or is already updated'}, status=400)
+#             else:
+#                 return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+#     except Member.DoesNotExist:
+#         return JsonResponse({'error': 'Member not found'}, status=404)
+#     except Exception as e:
+#         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+    
 
 def revert_pvwMonthlyUpdate_Contributions(request):
     try:
@@ -392,140 +667,11 @@ def revert_pvwMonthlyUpdate_Contributions(request):
 
     except Exception as e:
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+    
 
 
 
-
-# def pvwUpdateContributions(request):
-#     try:
-#         with transaction.atomic():
-#             members_data = Member.objects.all()
-
-#             for member in members_data:
-#                 repaid_advance_amount = 0
-#                 repaid_advance_interest = 0
-
-#                 # Check if the member has a Benovelent instance
-#                 if hasattr(member, 'benovelent'):
-#                     # Fetch benovelent contribution from the Benovelent model
-#                     benovelent_contribution = member.benovelent.benov_amount
-#                     # Fetch share contribution from the share model model
-#                     share_contribution = member.share_amount.share_amount
-
-#                     try:
-#                         advance_loan_instances = AdvanceLoan.objects.filter(member=member, is_disbursed=True, is_repaid=False)
-#                         if advance_loan_instances.exists():
-#                             for advance_loan_instance in advance_loan_instances:
-#                                 repaid_advance_amount = advance_loan_instance.borrowed_amount
-#                                 repaid_advance_interest = advance_loan_instance.interest
-#                         else:
-#                             print("No matching AdvanceLoan instances found.")
-#                     except AdvanceLoan.DoesNotExist:
-#                         pass  # Handle the exception if needed
-
-#                     # Check if advance loan is greater than zero
-#                     if repaid_advance_amount > 0:
-#                         # Set salary_advance_loan back to zero in the Member model
-#                         member.clear_salary_advance_loan()
-
-#                         # Set is_repaid to True in the AdvanceLoan model
-#                         advance_loan_instance.approve_loan_repaid()
-
-#                         # Create a transaction record for advance loan repayment
-#                         Transaction.objects.create(
-#                             member=member,
-#                             activity_type='advance loan repayment',
-#                             description="Advance Loan Repaid Successfully",
-#                             debit=repaid_advance_amount,
-#                             credit=0,
-#                         )
-
-#                         Transaction.objects.create(
-#                             member=member,
-#                             activity_type='advance loan interest',
-#                             description="Advance Loan interest on repayment",
-#                             debit=repaid_advance_interest,
-#                             credit=0,
-#                         )
-
-#                     try:
-#                         welfare_loan_instances = WelfareLoan.objects.filter(member=member, is_disbursed=True, is_repaid=False)
-#                         for welfare_loan_instance in welfare_loan_instances:
-                        
-#                             reducing_table_entries = welfare_loan_instance.reducing_table.filter(
-#                                 is_picked=False,
-#                                 date_picked=None
-#                             ).order_by('month')[:1]
-
-#                             if reducing_table_entries.exists():
-#                                 reducing_entry = reducing_table_entries[0]
-                                
-#                                 # Update reducing table entry
-#                                 reducing_entry.is_picked = True
-#                                 reducing_entry.date_picked = timezone.now().date()
-#                                 reducing_entry.status = 'picked'
-#                                 reducing_entry.save()
-
-#                                 # Update member model and deduct from normal_loan and normal_loan_interest
-#                                 member.deduct_from_normal_loan(reducing_entry.installment, reducing_entry.interest)
-
-#                                 # Fetch or create the Payroll instance associated with the member
-#                                 payroll_instance, created = Payroll.objects.get_or_create(member=member)
-
-#                                 # Update payroll model and loan_wf from reducing table
-#                                 payroll_instance.update_loan_wf_from_reducing_table(welfare_loan_instance)
-
-#                                 print(f"Reducing Table Entry picked for Welfare Loan {welfare_loan_instance.loan_id}")
-
-#                             else:
-#                                 print(f"No suitable reducing table entry found for Welfare Loan {welfare_loan_instance.loan_id}")
-#                                 # Fetch or create the Payroll instance associated with the member
-#                                 payroll_instance, created = Payroll.objects.get_or_create(member=member)
-                                
-#                                 # Update loan_wf with zero
-#                                 payroll_instance.loan_wf = 0
-#                                 payroll_instance.save()
-
-#                     except WelfareLoan.DoesNotExist:
-#                         pass 
-
-#                     # Update benovelent contribution for the member
-#                     member.update_benovelent_contribution(benovelent_contribution)
-#                     member.update_shares_contribution(share_contribution)
-#                     member.update_welfare()
-
-#                     # Create or update Payroll record
-#                     payroll, created = Payroll.objects.get_or_create(member=member)
-#                     payroll.full_name = member.personal_details.get_full_name()
-#                     payroll.welfare = share_contribution
-#                     payroll.benovelent = benovelent_contribution
-#                     payroll.advance = repaid_advance_amount + repaid_advance_interest
-#                     payroll.save()
-
-#                     # Create a transaction record for benovelent contribution
-#                     Transaction.objects.create(
-#                         member=member,
-#                         activity_type='benovelent',
-#                         description="Benovelent Contribution Update",
-#                         debit=0,
-#                         credit=benovelent_contribution,
-#                     )
-
-#                     # Create a transaction record for shares contribution
-#                     Transaction.objects.create(
-#                         member=member,
-#                         activity_type='shares',
-#                         description="Shares Contribution Update",
-#                         debit=0,
-#                         credit=share_contribution,
-#                     )
-#                 else:
-#                     # Handle the case where a Benovelent instance is not found
-#                     print(f"No Benovelent instance found for Member {member.user.member_number}")
-
-#             return redirect('admindashboard')
-#     except Exception as e:
-#         return HttpResponseServerError(f"An error occurred: {str(e)}")
+# --------------------- PVW UPDATE CONTRIBUTIONS MONTHLY END ------------------------ #    
 
 
 
@@ -775,6 +921,11 @@ def approve_member(request, member_id):
             user.status = 'Approved'
             user.save()
 
+            # Update welfare_new_acccounts_reg in WelfareStatistics model
+            welfare_stats = WelfareStatistics.objects.first()  
+            welfare_stats.welfare_new_acccounts_reg += 3200
+            welfare_stats.save()
+
             return JsonResponse({
                 'success': f'Successfully approved {full_name} as a member of Parkside Villa Welfare Group with Member Number {member_number}',
                 'full_name': full_name,
@@ -920,6 +1071,7 @@ def reject_advanceLoan_request(request, loan_id):
 
 # APPROVE ADVANCE LOAN AND DISBURSE TO BORROWER
 def approve_advance_loan(request, loan_id):
+    
     try:
         with transaction.atomic():
             borrowed_loan = AdvanceLoan.objects.get(loan_id=loan_id)
@@ -933,7 +1085,10 @@ def approve_advance_loan(request, loan_id):
                 borrowed_loan.approve_loan_disbursed()
                 borrowed_loan.save()
 
-                # Update Member's salary_advance_loan
+                print(borrowed_loan.borrowed_amount)  
+                print(borrowed_loan.interest)
+
+                # Update Member's salary_advance_loan//ensure to check if member already have a loan
                 member = borrowed_loan.member
                 member.update_salary_advance_loan(borrowed_loan.borrowed_amount)
                 member.update_salary_advance_loan_interest(borrowed_loan.interest)
@@ -960,6 +1115,7 @@ def approve_advance_loan(request, loan_id):
     except AdvanceLoan.DoesNotExist:
         return JsonResponse({'error': 'AdvanceLoan not found'}, status=404)
     except Exception as e:
+        print(f'An error occurred: {str(e)}')  # Print the actual error message for debugging
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
 
@@ -1081,6 +1237,7 @@ def reject_welfareLoan_request(request, loan_id):
         return JsonResponse({'error': 'WelfareLoan not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+
 
 
 # APPROVE WELFARE LOAN AND DISBURSE TO BORROWER

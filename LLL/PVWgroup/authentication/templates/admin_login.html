@@ -8,16 +8,20 @@
         <p id="loginHeader" class="login-header">Admin Portal</p>
 
         <!-- login form start -->
-        <form action="{% url 'admin_login' %}" method="post" class="form">
+        <form action="#" class="form" id="admin-login-form">
             {% csrf_token %}
 
             <div class="input_group">
-                <input type="text" name="username" placeholder="Username" class="input_text" autocomplete="off" required>
-            </div>   
+                <input type="text" name="username" placeholder="Username" class="input_text" autocomplete="off" required id="admin-username">
+            </div>  
+            <div id="admin-username-error" class="input-error-div"></div>
+
             <div class="input_group">
                 <input type="password" name="password" id="logPassword" placeholder="Password" class="input_pass" autocomplete="off" required>
                 <i class="fas fa-eye" id="showPasswordIcon"></i>
-            </div>                       
+            </div>   
+            <div id="logPassword-error" class="input-error-div"></div>
+
             <div class="extended-login-form">
                 <div class="remberme">
                     <input type="checkbox" name="rememberMe" id="rememberMeCheckbox">
@@ -27,9 +31,11 @@
                     <a href="{% url 'custom_password_reset' %}"  class="forgotpassword">Forgot password?</a>
                 </div>
             </div>
+
             <div class="input_group">
-                <input type="submit" class="login-submit-btn" value="Login Now">
+                <input type="submit" class="login-submit-btn" value="Login Now" id="admin-login-submit-button">
             </div>
+
             <div class="login-footer">
                 <p>Don't have an account?</p>
                 <a href="{% url 'signup' %}">Create an account</a>
@@ -38,41 +44,27 @@
         </form> 
         <!-- login form start -->
 
+        <!-- admin login wait preloader -->
+        <div id="preloader" style="display: none;">
+            <div class="lds-spinner">
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+            <p class="lds-text">Processing Access Request. Please wait...</p>
+        </div>
+
 </section>
 <!-- admin login container end -->
-
-
-<!-- Popup Containers -->
-
-<!-- failed login -->
-<div class="hidddd" {% if invalid_login %}style="display: block;"{% endif %}>
-    {% if invalid_login %}
-        <script>
-            Swal.fire({
-                icon: "error",
-                title: "Oops...",
-                text: "Invalid login credentials!",
-                footer: '<a href="#">Why do I have this issue?</a>'
-            });
-        </script>
-    {% endif %}
-</div>
-<div class="overlay" {% if invalid_login %}style="display: block;"{% endif %}></div>
-
-<!-- not superuser -->
-<div class="hidddd" {% if not_superuser %}style="display: block;"{% endif %}>
-    {% if not_superuser %}
-        <script>
-            Swal.fire({
-                icon: "error",
-                title: "FAILED...",
-                text: "ACCESS DENIED!",
-                footer: '<a href="#">Why do I have this issue?</a>'
-            });
-        </script>
-    {% endif %}
-</div>
-<div class="overlay" {% if not_superuser %}style="display: block;"{% endif %}></div>
 
 
 {% endblock %}

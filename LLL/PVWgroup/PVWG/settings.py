@@ -137,6 +137,27 @@ DATABASES = {
 #     }
 # }
 
+# ONLINE DB CONNECTION
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'hamiscod_PVWG3',
+#         'USER': 'hamiscod_pvwg3adm',
+#         'PASSWORD': '04116201@Bamba',
+#         'HOST': 'localhost',
+#         'PORT': '3306',
+#         'OPTIONS': {
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+#         },
+#     }
+# }
+
+
+
+
+
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

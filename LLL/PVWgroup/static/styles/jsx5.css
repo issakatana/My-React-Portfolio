@@ -29,6 +29,18 @@ img {
 a {
     text-decoration: none;
 }
+.pending-approvalpvwUpdate,
+.pending-approvalwel {
+    max-height: 300px; 
+    overflow-y: auto;
+}
+.table-container {
+    max-height: 200px; 
+    overflow-y: auto;
+}
+
+
+
 
 /* BODY LAYOUT */
 body {
@@ -637,133 +649,130 @@ input[type="search"]::placeholder {
     color: white;
     margin: 1vw 0;
 }
-
 /* MEMBERS PORTAL MAIN SECTION END*/
 
 
-.memberPortal-accounts {
+
+/* preloader */
+#preloader {
     display: none;
-    padding: 1vw 3vw;
-}
-.memberPortal-accounts.active {
-    display: block;
-}
-.my-accountl, .my-accounts,
-.grid-display {
-    display: none;
-    gap: 2rem;
-    --min-column-size:15rem;
-    grid-template-columns: repeat(auto-fit, minmax(min(var(--min-column-size), 100%), 1fr));
-    place-items: center;
-}
-.summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-flow: column nowrap;
-    width: 90%;
-    border: 1px solid whitesmoke;
-    padding: 1vw;
-    border-radius: 10px;
-}
-.summary_values {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-flow: row nowrap;
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 100%;
-    border-radius: 10px;
-}
-.summary p {
-    font-size: .8rem;
-    width: 100%;
-}
-.dropdown-select-toggle {
+    height: 100vh;
+    background-color: rgba(137, 125, 125, 0.8);
+    text-align: center;
+    z-index: 1000;
     display: flex;
+    align-items: center;
     justify-content: center;
-    flex-flow: column nowrap;
-    gap: 1rem;
-    padding-left: 8vw;
-}
-.dropdown-select-toggle i {
-    padding-left: 1vw;
-}
-.my-accounts {
-    display: grid;
-}
-.memberPortal-loans {
-    display: none;
-}
-.memberPortal-loans.active {
-    display: block;
-}
-.chevLeftDown a.active {
-    background-color: #ddd; 
 }
 
+.lds-spinner {
+    display: inline-block;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px;
+    height: 80px;
+    color: var(--fontColorGeneral);
+}
+.lds-text {
+    position: absolute;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: bold;
+    color: var(--fontColorGeneral);
+}
 
-.centered {
-    display: grid;
-    place-items: center;
-    padding: 1vw;
-    gap: 30px;
+.lds-spinner div {
+    transform-origin: 40px 40px;
+    animation: lds-spinner 1.2s linear infinite;
 }
-.blockAccountFormGroups .form-group,
-.shareAdjustmentForm .form-group {
-    padding-bottom: 1vw;
+
+.lds-spinner div:after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 3px;
+    left: 37px;
+    width: 6px;
+    height: 18px;
+    border-radius: 20%;
+    background: var(--fontColorGeneral);
+    font-weight: bold;
 }
-.btn-group {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+
+.lds-spinner div:nth-child(1) {
+    transform: rotate(0deg);
+    animation-delay: -1.1s;
 }
-.submitBlockAccount {
-    border: none;
-    padding: 15px 30px;
-    color: white;
-    background: green;
+
+.lds-spinner div:nth-child(2) {
+    transform: rotate(30deg);
+    animation-delay: -1s;
 }
-@media screen and (max-width:720px) {
-    .blockAccountFormGroups .form-group {
-        padding-bottom: 10vw;
+
+.lds-spinner div:nth-child(3) {
+    transform: rotate(60deg);
+    animation-delay: -0.9s;
+}
+
+.lds-spinner div:nth-child(4) {
+    transform: rotate(90deg);
+    animation-delay: -0.8s;
+}
+
+.lds-spinner div:nth-child(5) {
+    transform: rotate(120deg);
+    animation-delay: -0.7s;
+}
+
+.lds-spinner div:nth-child(6) {
+    transform: rotate(150deg);
+    animation-delay: -0.6s;
+}
+
+.lds-spinner div:nth-child(7) {
+    transform: rotate(180deg);
+    animation-delay: -0.5s;
+}
+
+.lds-spinner div:nth-child(8) {
+    transform: rotate(210deg);
+    animation-delay: -0.4s;
+}
+
+.lds-spinner div:nth-child(9) {
+    transform: rotate(240deg);
+    animation-delay: -0.3s;
+}
+
+.lds-spinner div:nth-child(10) {
+    transform: rotate(270deg);
+    animation-delay: -0.2s;
+}
+
+.lds-spinner div:nth-child(11) {
+    transform: rotate(300deg);
+    animation-delay: -0.1s;
+}
+
+.lds-spinner div:nth-child(12) {
+    transform: rotate(330deg);
+    animation-delay: 0s;
+}
+
+@keyframes lds-spinner {
+    0% {
+        opacity: 1;
     }
-}
-
-
-
-.memberDeclaration, .bankDetails,
-.deceasedInformation, .memberDetails {
-    padding: 1vw 4vw;
-}
-.htb {
-    font-weight: bold;
-    color: #333;
-}
-.memberDetailsContents,
-.deceasedInformationContents,
-.bankDetailsContents {
-    display: grid;
-    gap: .4rem;
-    --min-column-size:10rem;
-    grid-template-columns: repeat(auto-fit, minmax(min(var(--min-column-size), 100%), 1fr));
-}
-.benevolentButton  {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 4vw;
-}
-.benevolentButtonInput,
-.deceasedInformationBtn {
-    border: none;
-    padding: 15px 30px;
-    color: #fff;
-    background: green;
-    font-weight: bold;
-}
-.deceasedInformationBtn {
-    padding: 1vw;
-    margin: 2vw;
+    100% {
+        opacity: 0;
+    }
 }
 
 

@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils import timezone
+from decimal import Decimal
+
 
 
 class CustomUserManager(BaseUserManager):
@@ -117,17 +119,17 @@ class Member(models.Model):
     def update_normal_loan(self, normal_loan_amount):
         self.normal_loan += normal_loan_amount
         self.save()
-
+        
     def update_normal_loan_interest(self, normal_loan_interest):
         self.normal_loan_interest += normal_loan_interest
         self.save()
     
     def update_salary_advance_loan(self, salary_advance_loan_amount):
-        self.salary_advance_loan += salary_advance_loan_amount
+        self.salary_advance_loan += Decimal(str(salary_advance_loan_amount))
         self.save() 
-
+        
     def update_salary_advance_loan_interest(self, salary_advance_loan_interest):
-        self.salary_advance_loan_interest += salary_advance_loan_interest
+        self.salary_advance_loan_interest += Decimal(str(salary_advance_loan_interest))
         self.save()       
 
     def clear_salary_advance_loan(self):
