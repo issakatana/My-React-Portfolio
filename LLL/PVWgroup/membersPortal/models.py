@@ -51,3 +51,15 @@ class MailSmsVerificationCode(models.Model):
         adminLoginPassCode = cls.objects.create(sender_member=receiver_member, receiver_member=receiver_member, code=verification_code, code_purpose=purpose)
 
         return adminLoginPassCode     
+    
+
+class MemberReasons(models.Model):
+    account_manager = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='account_manager', default=0)
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='target_member', default=0)
+    action = models.CharField(max_length=100)
+    action_reason = models.CharField(max_length=5000)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f'{self.account_manager.user.member_number} - {self.action} on {self.member.user.member_number}'
+

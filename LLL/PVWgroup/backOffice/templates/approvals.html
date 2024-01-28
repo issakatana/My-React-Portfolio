@@ -59,7 +59,7 @@
                 <div id="popupContent">
                     <!-- Member details will be shown here -->
                 </div>
-                <button id="popupPrevButton" style="display: none;">Back</button>
+                <button id="popupPrevButton" style="display: none;" class="popupPrevButtonB">Back</button>
                 <button id="popupNextButton">Next</button>
                 <button id="popupRejectButtonAcc" class="popupRejectButtonAcc" style="display: none;">
                     <a href='#' id="rejectLinkAcc" class="rejectLink" data-rejectAccountCreatedLoan-url="{% url 'reject_accountCreated_request' member_id=1 %}">Reject</a>
@@ -106,6 +106,24 @@
                 $('#filterSelect').trigger('change');
             });
         </script>
+    <!-- new accounts created approval preloader -->
+    <div id="preloadernewaccounts" style="display: none;">
+        <div class="lds-spinner">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <p class="lds-text">Fetching data...</p>
+    </div>    
     </article>
     <!-- new created accounts end -->
 
@@ -159,7 +177,7 @@
                     <div id="benevolentPopupContent">
                         <!-- Member details will be shown here -->
                     </div>
-                    <button id="popupPrevButtonclm" style="display: none;">Back</button>
+                    <button id="popupPrevButtonclm" style="display: none;" class="popupPrevButtonB">Back</button>
                     <button id="popupNextButtonclm">Next</button>
                     <button id="popupRejectButtonclm" class="popupRejectButtonclm" style="display: none;">
                         <a href='#' id="rejectLinkclm" class="rejectLink" data-rejectBenevolentClaim-url="{% url 'reject_benevolentClaim_request' id=1 %}">Reject</a>
@@ -488,7 +506,7 @@
                     <div id="advancePopupContent">
                         <!-- Member details will be shown here -->
                     </div>
-                    <button id="popupPrevButtonadv" style="display: none;">Back</button>
+                    <button id="popupPrevButtonadv" style="display: none;" class="popupPrevButtonB">Back</button>
                     <button id="popupNextButtonadv">Next</button>
                     <button id="popupRejectButtonadv" class="popupRejectButtonadv" style="display: none;">
                         <a href='#' id="rejectLink" class="rejectLink" data-rejectAdvanceLoan-url="{% url 'reject_advanceLoan_request' loan_id=1 %}">Reject</a>
@@ -533,7 +551,7 @@
                     {% endfor %}
                     {% if not  welfare_loan_unapproved_requests %}
                         <tr>
-                            <td colspan="9">No welfare loan requested at this moment.</td>
+                            <td colspan="8">No welfare loan requested at this moment.</td>
                         </tr>
                     {% endif %}
                 </tbody>
@@ -562,12 +580,14 @@
     </article>
     <!------------------------------------- Advance Loan and Welfare Loans Approvals requests End-------------------------------- -->
 
+
+
     <article class="loanRepayment admin-approvals" id="loanRepayment">
         <div class="my-member-tittle profile-tittle">
             <p class="tooltip-trigger" id="defaultLRP">Loan Repayment Schedules: <i class="fa fa-chevron-down" aria-hidden="true"></i></p>
             <div class="tooltip">
-                <span onclick="showLoanRepayment('advanceLoanRunning')">Running Advance Loans </span>
-                <span onclick="showLoanRepayment('welfareLoanRunning')">Running Welfare Loans </span>
+                <span onclick="showLoanRepayment('advanceLoanRunning')">Active Advance Loans </span>
+                <span onclick="showLoanRepayment('welfareLoanRunning')">Active Welfare Loans </span>
                 <span onclick="showLoanRepayment('advanceLoanRepayment')">Advance Loan Unapproved Repayment </span>
                 <span onclick="showLoanRepayment('welfareLoanRepayment')">Welfare Loan Unapproved Repayment </span>
                 <span onclick="showLoanRepayment('loanRepaymentSchedules')">Loan Repayment Schedules </span>
@@ -664,7 +684,10 @@
                 });
             </script>       
         </div>
+
+        <!-- active advance loans start -->
         <div class="advanceLoanRunning statements" id="advanceLoanRunning">
+
             <table class="tbl">
                 <thead>
                     <tr>
@@ -683,26 +706,31 @@
                     {% for  advance_loan_running in  advance_loan_runnings %}
                         <tr>
                             <td>{{ advance_loan_running.date_requested }}</td>
+                            <td>{{ advance_loan_running.maturity_date }}</td>
+                            <td>{{ advance_loan_running.loan_id }}</td>
                             <td>{{ advance_loan_running.member.personal_details.get_full_name|default:"N/A" }}</td>
                             <td>{{ advance_loan_running.member.user.member_number|default:"N/A" }}</td>
                             <td>{{ advance_loan_running.borrowed_amount }}</td>
-                            <td>{{ advance_loan_running.borrowed_amount }}</td>
                             <td>{{ advance_loan_running.interest }}</td>
                             <td>{{ advance_loan_running.amount_to_be_paid }}</td>
-                            <td>{{ advance_loan_running.maturity_date }}</td>
+                          
                             <td>
-                                <a href="#" style="color: #066638;font-weight: bold;">Running</a>
+                                <a href="#" style="color: #066638;font-weight: bold;">Active</a>
                             </td>
+
                         </tr>
                     {% endfor %}
                     {% if not advance_loan_runnings %}
                         <tr>
-                            <td colspan="8">No advance loan Running at this moment.</td>
+                            <td colspan="9">No active advance loan at this moment.</td>
                         </tr>
                     {% endif %}
                 </tbody>
             </table>
+
         </div>
+        <!-- active advance loans end -->
+
         <div class="welfareLoanRunning statements" id="welfareLoanRunning">
             <table class="tbl">
                 <thead>
@@ -736,15 +764,91 @@
                     {% endfor %}
                     {% if not welfare_loan_runnings %}
                         <tr>
-                            <td colspan="8">No welfare loan Running at this moment.</td>
+                            <td colspan="9">No welfare loan Running at this moment.</td>
                         </tr>
                     {% endif %}
                 </tbody>
             </table>            
         </div>
+
+        <!-- advance loan Unapproved repayment start -->
         <div class="advanceLoanRepayment statements" id="advanceLoanRepayment">
-            <h1>ALRP</h1>
+        
+            {% if advance_loan_runnings %}
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Date Disbursed</th>
+                        <th>Loan ID</th>
+                        <th>Member Number</th>
+                        <th>Amount Borrowed</th>
+                        <th>Loan Interest</th>
+                        <th>Paid</th>
+                        <th>Outstanding Loan Bal</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for  advance_loan_running in  advance_loan_runnings %}
+                        {% if advance_loan_running.status == 'partialPaid' or advance_loan_running.status == 'pendingPayment'  %}
+                        <tr> 
+                            <td>{{ advance_loan_running.date_requested }}</td>
+                            <td>{{ advance_loan_running.loan_id }}</td>
+                            <td>{{ advance_loan_running.member.user.member_number|default:"N/A" }}</td>
+                            <td
+                                style="color: darkorange;font-weight:bold;"
+                            >{{ advance_loan_running.static_loan_borrowed_amount }}</td>
+
+                            <td 
+                               style="display: none;"
+                               id="borrowedAmount_{{ advance_loan_running.loan_id }}"
+                            >{{ advance_loan_running.borrowed_amount }}</td>
+
+                            <td 
+                                style="color: darkred;font-weight:bold;"
+                                id="loanInterest_{{ advance_loan_running.loan_id }}"
+                            >{{ advance_loan_running.interest }}</td>
+
+                            <td
+                               style="color: green;font-weight:bold;"
+                               id="amountPaid_{{ advance_loan_running.loan_id }}"
+                            >{{ advance_loan_running.userRepayableRequest }}</td>
+
+                            <td> {{ advance_loan_running.difference }}</td>
+                        
+                            <td>
+                                {% if advance_loan_running.status == 'approved' or advance_loan_running.status == 'partialPaid' %}
+                                <span style="color: green;font-weight:bold;">Active</span>
+                                {% elif advance_loan_running.status == 'pendingPayment' %}
+                                <span style="color: #FF8C00;font-weight:bold;">Payment In Review</span>  
+                                {% else %}
+                                    {{ advance_loan_running.status }}
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if advance_loan_running.status == 'pending' or loan.status == 'approved'  %}
+                                <a href="#">None</a>
+                                {% else %}
+                                <a href="#" class="loan_repay" id="repayNowBtn_{{ advance_loan_running.loan_id }}" data-loan-id="{{ advance_loan_running.loan_id }}">Approve Repayment</a>
+                                {% endif %}
+                            </td>
+                            
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <tr>
+                <td colspan="9">No advance loan Repayment requests at this moment.</td>
+            </tr>
+            {% endif %}
+
         </div>
+       <!-- advance loan Unapproved repayment end -->
+
         <div class="welfareLoanRepayment statements" id="welfareLoanRepayment">
             <h1>WLRP</h1>
         </div>
@@ -829,14 +933,14 @@
             document.getElementById('welfareLoanRepayment').style.display = 'none';
             document.getElementById('advanceLoanRunning').style.display = 'block';
             document.getElementById('welfareLoanRunning').style.display = 'none';
-            document.getElementById('defaultLRP').innerHTML = '<p class="tooltip-trigger" id="default">Running Advance Loans <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+            document.getElementById('defaultLRP').innerHTML = '<p class="tooltip-trigger" id="default">Active Advance Loans <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
         } else {
             document.getElementById('loanRepaymentSchedules').style.display = 'none';
             document.getElementById('advanceLoanRepayment').style.display = 'none';
             document.getElementById('welfareLoanRepayment').style.display = 'none';
             document.getElementById('advanceLoanRunning').style.display = 'none';
             document.getElementById('welfareLoanRunning').style.display = 'block';
-            document.getElementById('defaultLRP').innerHTML = '<p class="tooltip-trigger" id="default">Running Welfare Loans <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
+            document.getElementById('defaultLRP').innerHTML = '<p class="tooltip-trigger" id="default">Active Welfare Loans <i class="fa fa-chevron-down" aria-hidden="true"></i></p>';
         }
     }    
 </script>
@@ -1026,6 +1130,63 @@
     .approveBenevolentClaim {
         color: #066638;
     }
-</style>
+    .loan_repay {
+        font-weight: bold;
+        background-color: #007bff;
+        color: #fff;
+        padding: 5px 10px; 
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none; 
+        display: inline-block; 
+        text-align: center; 
+        transition: background-color 0.3s ease; 
+      }
+    
+      .loan_repay:hover {
+        background-color: #aaa;
+      }
+    
+    
+    .swal-button-full-repay {
+      background-color: #4CAF50; 
+      color: white;
+      padding: 10px 20px;
+      margin-right: 10px; 
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    
+    
+    .swal-button-partial-repay {
+      background-color: #2196F3; 
+      color: white;
+      padding: 10px 20px;
+      margin-left: 10px; 
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    
+    
+    .swal-button-cancel,
+    .swal-button {
+      background-color: #555; 
+      color: white;
+      padding: 10px 15px;
+      margin-left: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    
+    
+    </style>
+
+
+
+
 
 {% endblock %}

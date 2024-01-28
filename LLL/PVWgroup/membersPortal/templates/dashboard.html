@@ -75,7 +75,9 @@
                             <td>{{ transaction.posting_date }}</td>
                             <td>{{ transaction.description }}</td>
                             <td>
-                                {% if transaction.credit %}
+                                {% if transaction.description == "Benevolent Claim successfully submitted" %}
+                                    <strong> - </strong>
+                                {% elif transaction.credit %}
                                     {{ transaction.credit }}
                                 {% elif transaction.debit %}
                                     -{{ transaction.debit }}
@@ -91,8 +93,8 @@
                     </tr>
                 {% endif %}
             </tbody>
-        </table>   
-
+        </table>
+          
     </article>
 
 </section>

@@ -61,6 +61,7 @@ $(document).ready(function () {
             }
         }
     });
+
 });
 
 
@@ -113,24 +114,107 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-// SUBMIT BENEVOLENT CLAIM DATA
-document.addEventListener('DOMContentLoaded', function () {
+// HANDLE BENEVOLENT APPLICATION PROCESS
+document.addEventListener('DOMContentLoaded', function () { 
     const deceasedInformationPopupContent = document.getElementById('deceasedInformationPopupContent');
     const overlaydi = document.getElementById('overlaydi');
-    const deceasedInformationList = document.getElementById('deceasedInformationList');
+    const deceasedInformationList = document.getElementById('deceasedInformationList');   
 
-    let currentSectiondi = 0;
-    let sectionsdi = [];
+    // Function to clear the entire local storage
+    function clearLocalStorage() {
+        localStorage.clear();
+    }
+
+    // Function to get data from local storage or use default values
+    function getFromLocalStorage(key, defaultValue) {
+        const storedValue = localStorage.getItem(key);
+        return storedValue ? JSON.parse(storedValue) : defaultValue;
+    }
+
+    // Function to save data to local storage
+    function saveToLocalStorage(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    // Function to delete data from local storage
+    function deleteFromLocalStorage(key) {
+        localStorage.removeItem(key);
+    } 
+
+    
+    // Benevolent formdata object
+    const benevolentFormData = getFromLocalStorage('benevolentFormData', getDefaultBenevolentFormData());
+
+    // Function to set default values for benevolent form data
+    function getDefaultBenevolentFormData() {
+        return {
+            memberDetails: {
+                full_name: '{{ full_name }}',
+                position: '{{ member_position }}',
+                id_number: '{{ member_idno }}',
+                phone_number: '{{ phone_number }}',
+                residence: '{{ residence }}'
+            },
+            deceasedInformation: {
+                deceasedChecked: [] 
+            },
+            bankDetails: {},
+            memberDeclaration: false
+        };
+    }
    
-    // Form data object
-    const formData = {
-        memberDetails: {},
-        deceasedInformation: {
-            deceasedChecked: [] 
-        },
-        bankDetails: {},
-        memberDeclaration: {}
-    };
+    function updateBenevolentFormData() {
+        saveToLocalStorage('benevolentFormData', benevolentFormData);
+    }
+    
+    // Function to delete benevolent form data from local storage
+    function deleteBenevolentFormData() {
+        deleteFromLocalStorage('benevolentFormData');
+    }
+
+    // Function to reset the form and clear form fields
+    function resetForm() {
+        // Assuming you have a form with the ID "benevolentApplicationForm"
+        const benevolentApplicationForm = document.getElementById("benevolentApplicationForm");
+        benevolentApplicationForm.reset(); // Reset the form
+
+        // You may also want to clear the benevolentFormData object
+        benevolentFormData.memberDetails = {};
+        benevolentFormData.deceasedInformation = {};
+        benevolentFormData.bankDetails = [];
+        benevolentFormData.memberDeclaration = false;
+        
+        // Update and save the cleared form data to local storage
+        updateBenevolentFormData();
+    }
+
+    if (getDefaultBenevolentFormData) {
+        // // Parse the stored data and update the formData
+        // formData.deceasedInformation.deceasedChecked = JSON.parse(storedData);
+
+        // Add rows to the deceasedInformationList
+        benevolentFormData.deceasedInformation.deceasedChecked.forEach(rowData => {
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+                <td>${rowData.nameofdependant}</td>
+                <td>${rowData.dependantrelationship}</td>
+                <td class="idnumber">${rowData.dependantidnumber}</td>
+                <td>${rowData.dateofbirth}</td>
+                <td>${rowData.dateofdeath}</td>
+            `;
+
+            // Check for duplicate ID numbers
+            let newIdNumber = rowData.dependantidnumber;
+            let isDuplicate = Array.from(deceasedInformationList.querySelectorAll('.idnumber')).some(existingIdNumber => {
+                return existingIdNumber.textContent === newIdNumber;
+            });
+
+            if (!isDuplicate) {
+                // If not a duplicate, add the new row
+                deceasedInformationList.appendChild(newRow);
+            }
+        });
+    }
 
     function showSection(index) {
         sectionsdi.forEach((sectiondi, i) => {
@@ -178,50 +262,172 @@ document.addEventListener('DOMContentLoaded', function () {
         return fieldName.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
 
-    document.getElementById('popupCloseButtondi').addEventListener('click', function () {
-        overlaydi.style.display = 'none';
-        window.location.reload();
-    });
+    function handleSubmission() {
+        event.preventDefault();
 
-    document.getElementById('popupCloseButtondi2').addEventListener('click', function () {
-        overlaydi.style.display = 'none';
-        window.location.reload();
-    });
+        // Check if the clicked element has the correct ID
+        if (event.target.id === 'benevolentClaimSubmitButton') {
 
-     // Check for existing data in localStorage
-     const storedData = localStorage.getItem('deceasedChecked');
-     if (storedData) {
-         // Parse the stored data and update the formData
-         formData.deceasedInformation.deceasedChecked = JSON.parse(storedData);
- 
-         // Add rows to the deceasedInformationList
-         formData.deceasedInformation.deceasedChecked.forEach(rowData => {
-             const newRow = document.createElement('tr');
-             newRow.innerHTML = `
-                 <td>${rowData.nameofdependant}</td>
-                 <td>${rowData.dependantrelationship}</td>
-                 <td class="idnumber">${rowData.dependantidnumber}</td>
-                 <td>${rowData.dateofbirth}</td>
-                 <td>${rowData.dateofdeath}</td>
-             `;
- 
-             // Check for duplicate ID numbers
-             let newIdNumber = rowData.dependantidnumber;
-             let isDuplicate = Array.from(deceasedInformationList.querySelectorAll('.idnumber')).some(existingIdNumber => {
-                 return existingIdNumber.textContent === newIdNumber;
-             });
- 
-             if (!isDuplicate) {
-                 // If not a duplicate, add the new row
-                 deceasedInformationList.appendChild(newRow);
-             }
-         });
-     }
+            // Check if at least one dependant is selected
+            if (benevolentFormData.deceasedInformation.deceasedChecked.length === 0) {
+                Swal.fire({
+                    title: 'Deceased Information Required',
+                    text: 'Please select at least one dependant.',
+                    icon: 'warning',
+                    confirmButtonText: 'OK',
+                });
+                return; // Stop the form submission
+            }
+
+            // Populate the form data object with  member details values
+            benevolentFormData.memberDetails = {
+                full_name: document.getElementById('full_name').value,
+                id_number: document.getElementById('id_number').value,
+                phone_number: document.getElementById('phone_number').value,
+                position: document.getElementById('position').value,
+                residence: document.getElementById('residence').value,
+            };
+
+            // Check for empty member details
+            const emptyMemberDetailKey = Object.keys(benevolentFormData.memberDetails).find(key => benevolentFormData.memberDetails[key].trim() === '');
+            if (emptyMemberDetailKey) {
+                Swal.fire({
+                    title: 'Error',
+                    text: `${formatFieldName(emptyMemberDetailKey)} field cannot be empty`,
+                    icon: 'error',
+                    confirmButtonText: 'OK',
+                });
+                return;
+            }
+
+            // Populate the form data object with  bank details values
+            benevolentFormData.bankDetails = {
+                account_name: document.getElementById('account_name').value,
+                account_number: document.getElementById('account_number').value,
+                bank: document.getElementById('bank').value,
+                branch: document.getElementById('branch').value,
+            };
+
+            // Check for empty bank details
+            const emptyBankDetailKey = Object.keys(benevolentFormData.bankDetails).find(key => benevolentFormData.bankDetails[key].trim() === '');
+            if (emptyBankDetailKey) {
+                Swal.fire({
+                    title: 'Error',
+                    text: `${formatFieldName(emptyBankDetailKey)} field cannot be empty`,
+                    icon: 'error',
+                    confirmButtonText: 'OK',
+                });
+                return;
+            }
+            
+            benevolentFormData.memberDeclaration = {
+                agreement: document.querySelector('input[name="agreement"]:checked') ? true : false,
+            };
+                // Check if the agreement is not checked
+            if (!benevolentFormData.memberDeclaration.agreement) {
+                Swal.fire({
+                    title: 'Error',
+                    text: 'You must agree to the terms before submitting',
+                    icon: 'error',
+                    confirmButtonText: 'OK',
+                });
+                return;
+            }
+
+        
+            // Ask user for confirmation
+            Swal.fire({
+                title: 'Confirmation',
+                text: `Are you sure you want to submit Benevolent claim application for ${getDependantNames()}?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, submit',
+                cancelButtonText: 'Cancel',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                
+                    // Send the form data to the Django view using AJAX
+                    fetch('benevolent_claim_view', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken'),
+                        },
+                        body: JSON.stringify(benevolentFormData),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Handle the response from the server, if needed
+                      
+                        if (data.success) {
+                            // Clear the form input fields excluding member details
+                            document.getElementById('account_name').value = '';
+                            document.getElementById('account_number').value = '';
+                            document.getElementById('bank').value = '';
+                            document.getElementById('branch').value = '';
+                            // Uncheck the checkbox
+                            document.querySelector('input[name="agreement"]').checked = false;
+                            // Clear any other fields as needed
+
+                            // Clear the deceased information table
+                            document.getElementById('deceasedInformationList').innerHTML = '';
+
+                            // After successful submission, reset the form and remove data from local storage
+                            deleteBenevolentFormData();
+
+                            // Optionally, clear the entire local storage
+                            // clearLocalStorage();
+        
+                            // Show a SweetAlert
+                            Swal.fire({
+                                title: 'Success!',
+                                text: 'Benevolent Claim submitted successfully and is in review.',
+                                icon: 'success',
+                                confirmButtonText: 'OK',
+                            }).then(() => {
+                                location.reload();
+                            });
+                        } else {
+                            // Show an error SweetAlert
+                            Swal.fire({
+                                title: 'Error',
+                                text: 'An error occurred while submitting the Benevolent Claim.',
+                                icon: 'error',
+                                confirmButtonText: 'OK',
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error sending form data:', error);
+                        // Handle the error, if needed
+                    });
+
+                }
+            });
+            
+        } else {
+            alert('Submit Application Button Not Clicked')
+        }
+    }
+
+    function getDependantNames() {
+        const dependantNames = benevolentFormData.deceasedInformation.deceasedChecked.map(deceased => deceased.nameofdependant);
+        
+        if (dependantNames.length === 0) {
+            return '';
+        } else if (dependantNames.length === 1) {
+            return dependantNames[0];
+        } else {
+            const lastDependant = dependantNames.pop(); 
+            return dependantNames.join(', ') + ' and ' + lastDependant;
+        }
+    }
+
 
     // Get deceased Information from dependants model
     document.getElementById('deceasedInformationBtn').addEventListener('click', function (event) {
         event.preventDefault();
-    
+
         // Check if the clicked element has the correct ID
         if (event.target.id === 'deceasedInformationBtn') {
             // Make a GET request 
@@ -269,7 +475,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 </table>
                             </div>
                         `;
-        
+
                         currentSectiondi = 0;
                         sectionsdi = document.querySelectorAll('.pending-approvaldi');
                         showSection(currentSectiondi);
@@ -309,14 +515,15 @@ document.addEventListener('DOMContentLoaded', function () {
                                         success: function (data) {
                                             console.log('Update successful');
                                             // Update local storage in real-time
-                                            updateLocalStorage();
+                                            updateBenevolentFormData();
+                                            // updateLocalStorage();
                                         },
                                         error: function () {
                                             console.log('Update failed');
                                         }
                                     });
 
-                                    formData.deceasedInformation.deceasedChecked.push({
+                                    benevolentFormData.deceasedInformation.deceasedChecked.push({
                                         isChecked,
                                         deceasedId,
                                         dateofbirth: dateOfBirth,
@@ -325,9 +532,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                     });
                                 } else {
                                     // Checkbox is unchecked, remove data from selectedDeceasedRows
-                                    const index = formData.deceasedInformation.deceasedChecked.findIndex(item => item.dependantidnumber === deceasedId);
+                                    const index = benevolentFormData.deceasedInformation.deceasedChecked.findIndex(item => item.dependantidnumber === deceasedId);
                                     if (index !== -1) {
-                                        formData.deceasedInformation.deceasedChecked.splice(index, 1);
+                                        benevolentFormData.deceasedInformation.deceasedChecked.splice(index, 1);
                                     }
 
                                     // AJAX request to revert is_deceased field
@@ -341,7 +548,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                         success: function (data) {
                                             console.log('Revert successful');
                                             // Update local storage in real-time
-                                            updateLocalStorage();
+                                            // updateLocalStorage();
                                         },
                                         error: function () {
                                             console.log('Revert failed');
@@ -351,10 +558,11 @@ document.addEventListener('DOMContentLoaded', function () {
                             });
                         });
 
-                        // Function to update local storage
-                        function updateLocalStorage() {
-                            localStorage.setItem('deceasedChecked', JSON.stringify(formData.deceasedInformation.deceasedChecked));
-                        }
+                        // // Function to update local storage
+                        updateBenevolentFormData();
+                        // function updateLocalStorage() {
+                        //     localStorage.setItem('deceasedChecked', JSON.stringify(benevolentFormData.deceasedInformation.deceasedChecked));
+                        // }
                     }
                 })
                 .catch(error => {
@@ -370,29 +578,30 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
+
     document.getElementById('nextLink').addEventListener('click', function (event) {
         // Prevent the default form submission behavior
         event.preventDefault();
-    
+
         // Check if the clicked element has the correct ID
         if (event.target.id === 'nextLink') {
             // Clear the existing rows in deceasedInformationList
             deceasedInformationList.innerHTML = '';
-    
+
             // Filter out unchecked rows and add selected rows to the deceasedInformationTable
-            formData.deceasedInformation.deceasedChecked = formData.deceasedInformation.deceasedChecked.filter(rowData => {
+            benevolentFormData.deceasedInformation.deceasedChecked = benevolentFormData.deceasedInformation.deceasedChecked.filter(rowData => {
                 const isChecked = document.querySelector(`.deceasedCheckbox[data-deceased-id="${rowData.dependantidnumber}"]`).checked;
 
                 // Add the row only if it is checked
                 if (isChecked) {
                     // Check for duplicate ID numbers
                     let newIdNumber = rowData.dependantidnumber;
-    
+
                     // Check if a row with the same ID number already exists
                     let isDuplicate = Array.from(deceasedInformationList.querySelectorAll('.deceasedRow')).some(existingRow => {
                         return existingRow.dataset.idnumber === newIdNumber;
                     });
-    
+
                     if (isDuplicate) {
                         // Show a SweetAlert for duplicate ID number
                         Swal.fire({
@@ -415,17 +624,17 @@ document.addEventListener('DOMContentLoaded', function () {
                         `;
                         deceasedInformationList.appendChild(newRow);
                     }
-    
+
                     return true; // Keep the checked row in the array
                 } 
 
 
                 // If unchecked, remove from local storage
-                const index = formData.deceasedInformation.deceasedChecked.findIndex(item => item.dependantidnumber === rowData.dependantidnumber);
+                const index = benevolentFormData.deceasedInformation.deceasedChecked.findIndex(item => item.dependantidnumber === rowData.dependantidnumber);
                 if (index !== -1) {
-                    formData.deceasedInformation.deceasedChecked.splice(index, 1);
+                    benevolentFormData.deceasedInformation.deceasedChecked.splice(index, 1);
                 }
-    
+
                 // AJAX request to revert is_deceased field
                 $.ajax({
                     url: `revert_is_deceased/${rowData.dependantidnumber}/`,
@@ -441,13 +650,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         console.log('Revert failed');
                     }
                 });
-    
+
                 return false; // Remove the unchecked row from the array
             });
-    
+
             // Store the array in local storage
-            localStorage.setItem('deceasedChecked', JSON.stringify(formData.deceasedInformation.deceasedChecked));
-    
+            // localStorage.setItem('deceasedChecked', JSON.stringify(formData.deceasedInformation.deceasedChecked));
+            updateBenevolentFormData();
+
             // Hide the overlay
             overlaydi.style.display = 'none';
         } else {
@@ -459,7 +669,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('benevolentClaimSubmitButton').addEventListener('click', function(event) {
         handleSubmission();
     });
-    
+
     document.addEventListener('keypress', function(event) {
         // Check if the pressed key is Enter (keyCode 13)
         if (event.key === 'Enter') {
@@ -467,165 +677,47 @@ document.addEventListener('DOMContentLoaded', function () {
             handleSubmission();
         }
     });
-    
-    function handleSubmission() {
-        event.preventDefault();
-    
-        // Check if the clicked element has the correct ID
-        if (event.target.id === 'benevolentClaimSubmitButton') {
-    
-            // Check if at least one dependant is selected
-            if (formData.deceasedInformation.deceasedChecked.length === 0) {
-                Swal.fire({
-                    title: 'Deceased Information Required',
-                    text: 'Please select at least one dependant.',
-                    icon: 'warning',
-                    confirmButtonText: 'OK',
-                });
-                return; // Stop the form submission
-            }
-    
-            // Populate the form data object with  member details values
-            formData.memberDetails = {
-                full_name: document.getElementById('full_name').value,
-                id_number: document.getElementById('id_number').value,
-                phone_number: document.getElementById('phone_number').value,
-                position: document.getElementById('position').value,
-                residence: document.getElementById('residence').value,
-            };
-    
-            // Check for empty member details
-            const emptyMemberDetailKey = Object.keys(formData.memberDetails).find(key => formData.memberDetails[key].trim() === '');
-            if (emptyMemberDetailKey) {
-                Swal.fire({
-                    title: 'Error',
-                    text: `${formatFieldName(emptyMemberDetailKey)} field cannot be empty`,
-                    icon: 'error',
-                    confirmButtonText: 'OK',
-                });
-                return;
-            }
-    
-            // Populate the form data object with  bank details values
-            formData.bankDetails = {
-                account_name: document.getElementById('account_name').value,
-                account_number: document.getElementById('account_number').value,
-                bank: document.getElementById('bank').value,
-                branch: document.getElementById('branch').value,
-            };
-    
-            // Check for empty bank details
-            const emptyBankDetailKey = Object.keys(formData.bankDetails).find(key => formData.bankDetails[key].trim() === '');
-            if (emptyBankDetailKey) {
-                Swal.fire({
-                    title: 'Error',
-                    text: `${formatFieldName(emptyBankDetailKey)} field cannot be empty`,
-                    icon: 'error',
-                    confirmButtonText: 'OK',
-                });
-                return;
-            }
-            
-            formData.memberDeclaration = {
-                agreement: document.querySelector('input[name="agreement"]:checked') ? true : false,
-            };
-                // Check if the agreement is not checked
-            if (!formData.memberDeclaration.agreement) {
-                Swal.fire({
-                    title: 'Error',
-                    text: 'You must agree to the terms before submitting',
-                    icon: 'error',
-                    confirmButtonText: 'OK',
-                });
-                return;
-            }
 
-           
-            // Ask user for confirmation
-            Swal.fire({
-                title: 'Confirmation',
-                text: `Are you sure you want to submit Benevolent claim application for ${getDependantNames()}?`,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, submit',
-                cancelButtonText: 'Cancel',
-            }).then((result) => {
-                if (result.isConfirmed) {
-                
-                    // Send the form data to the Django view using AJAX
-                    fetch('benevolent_claim_view', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCookie('csrftoken'),
-                        },
-                        body: JSON.stringify(formData),
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        // Handle the response from the server, if needed
-                        console.log('Server Response:', data);
-                        if (data.success) {
-                            // Clear the form input fields excluding member details
-                            document.getElementById('account_name').value = '';
-                            document.getElementById('account_number').value = '';
-                            document.getElementById('bank').value = '';
-                            document.getElementById('branch').value = '';
-                            document.querySelector('input[name="agreement"]:checked').checked = false;
-                            // Clear any other fields as needed
+    // Close pop up deceased information in real time
+    document.getElementById('popupCloseButtondi').addEventListener('click', function () {
+        overlaydi.style.display = 'none';
+        window.location.reload();
+    });
+    document.getElementById('popupCloseButtondi2').addEventListener('click', function () {
+        overlaydi.style.display = 'none';
+        window.location.reload();
+    });
+    
+    // Update benevolent details in real-time
+    document.querySelector('.bankDetailsContents').addEventListener('input', function (event) {
+        const input = event.target;
+        benevolentFormData.bankDetails[input.name] = input.value;
+        updateBenevolentFormData();
+    });
+    // Populate benevolent details on page load
+    populateBenevolentBankDetails();
 
-                            // Clear the deceased information table
-                            document.getElementById('deceasedInformationList').innerHTML = '';
+    // Update member declaration in real-time
+    document.querySelector('.declarationDeclarationContents input[name="agreement"]').addEventListener('input', function (event) {
+        benevolentFormData.memberDeclaration = event.target.checked;
+        updateBenevolentFormData();
+    });
 
-                            // Clear the local storage for deceasedChecked
-                            localStorage.removeItem('deceasedChecked');
-        
-                            // Show a SweetAlert
-                            Swal.fire({
-                                title: 'Success!',
-                                text: 'Benevolent Claim submitted successfully and is in review.',
-                                icon: 'success',
-                                confirmButtonText: 'OK',
-                            }).then(() => {
-                            location.reload();
-                            });;
-                        } else {
-                            // Show an error SweetAlert
-                            Swal.fire({
-                                title: 'Error',
-                                text: 'An error occurred while submitting the Benevolent Claim.',
-                                icon: 'error',
-                                confirmButtonText: 'OK',
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error sending form data:', error);
-                        // Handle the error, if needed
-                    });
+    // Set member declaration based on local storage value on page refresh
+    document.querySelector('.declarationDeclarationContents input[name="agreement"]').checked = benevolentFormData.memberDeclaration;
 
-                }
-            });
-            
-        } else {
-            alert('Submit Application Button Not Clicked')
-        }
+    // Function to populate benevolent details from local storage
+    function populateBenevolentBankDetails() {
+        Object.keys(benevolentFormData.bankDetails).forEach(key => {
+            const inputElement = document.querySelector(`.bankDetailsContents input[name="${key}"]`);
+            if (inputElement) {
+                inputElement.value = benevolentFormData.bankDetails[key];
+            }
+        });
     }
-    
-    function getDependantNames() {
-        const dependantNames = formData.deceasedInformation.deceasedChecked.map(deceased => deceased.nameofdependant);
-        
-        if (dependantNames.length === 0) {
-            return '';
-        } else if (dependantNames.length === 1) {
-            return dependantNames[0];
-        } else {
-            const lastDependant = dependantNames.pop(); 
-            return dependantNames.join(', ') + ' and ' + lastDependant;
-        }
-    }
-    
-});    
+
+
+});
 
 
 
@@ -903,7 +995,9 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             return null;
         }
+
     });
+
 });
 
 
@@ -1019,6 +1113,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Attach event listeners to relevant form elements for real-time updates of loan details
     document.getElementById('amount').addEventListener('input', updateLoanDetails);
+    
     document.getElementById('advanceLoan').addEventListener('change', updateLoanDetails);
     document.getElementById('normalLoan').addEventListener('change', updateLoanDetails);
     document.getElementById('repaymentPeriod').addEventListener('input', updateLoanDetails);
@@ -1029,7 +1124,6 @@ document.addEventListener('DOMContentLoaded', function () {
     updateLoanDetailsFromLocalStorage()
 
     // -------------Loan Details End------------
-
 
 
     // --------------Guarantor Details Start---------------
@@ -1059,20 +1153,69 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     return;
                 } else {
+
                     const xhr = new XMLHttpRequest();
-                    xhr.open('GET', `get_guarantor_info/${memberNumber}/`, true);
+                    const loanAmountAppliedFor = document.getElementById("amount").value.trim();
+                    
+                    xhr.open('GET', `get_guarantor_info/${memberNumber}/?loan_amount=${loanAmountAppliedFor}`, true);
                     xhr.onload = function () {
+
                         if (xhr.status === 200) {
                             const data = JSON.parse(xhr.responseText);
+
+                            console.log(data)
+                    
                             document.getElementById('guarantorMemberNumber').value = '';
                             const tableBody = document.getElementById('loanGuarantorsList');
-
+                    
                             // Check if the guarantor is already in the table
                             const isGuarantorInTable = Array.from(tableBody.rows).some(row => {
                                 const idNumberCell = row.cells[2].textContent.trim();
                                 return idNumberCell === data.id_number;
                             });
-
+                    
+                            if (data.status == "maximum limit") {
+                                Swal.fire({
+                                    icon: "error",
+                                    title: "Oops...",
+                                    text: "The provided guarantor has reached the maximum limit of guaranteeing two loans. Please choose another guarantor.",
+                                    footer: '<a href="#" id="errorExplanationMaxLimit">Why do I see this?</a>'
+                                });
+                                // Event delegation to handle the click outside the Swal.fire callback
+                                document.body.addEventListener('click', function (e) {
+                                    if (e.target && e.target.id === 'errorExplanationMaxLimit') {
+                                        e.preventDefault();
+                                        Swal.fire({
+                                            title: 'Error Explanation',
+                                            text: 'A member can guarantee a maximum of two other members.',
+                                            icon: 'info'
+                                        });
+                                    }
+                                });
+                                return;
+                            }
+                    
+                            if (data.status == "not self guarantorship") {
+                                Swal.fire({
+                                    icon: "error",
+                                    title: "Oops...",
+                                    text: "You do not qualify for self guarantorship. Please consider using other members as your guarantors.",
+                                    footer: '<a href="#" id="errorExplanationNotSelfGuarantorship">Why do I see this?</a>'
+                                });
+                                // Event delegation to handle the click outside the Swal.fire callback
+                                document.body.addEventListener('click', function (e) {
+                                    if (e.target && e.target.id === 'errorExplanationNotSelfGuarantorship') {
+                                        e.preventDefault();
+                                        Swal.fire({
+                                            title: 'Error Explanation',
+                                            text: 'If a member intends to borrow an amount equal to 90% of their saved shares, they can act as their own guarantor. For example, if a member has shares worth KES 10,000 and wishes to borrow KES 90,000, they can guarantee themselves.',
+                                            icon: 'info'
+                                        });
+                                    }
+                                });
+                                return;
+                            }
+                            
                             if (!isGuarantorInTable) {
                                 // Add the new guarantor to the table only if not already present
                                 const newRow = tableBody.insertRow();
@@ -1082,38 +1225,41 @@ document.addEventListener('DOMContentLoaded', function () {
                                     <td>${data.member_number}</td>
                                     <td>${data.id_number}</td>
                                     <td>${data.phone_number}</td>
+                                    <td>${data.is_self_guarantorship}</td>
                                     <td class="pending-acceptance">Pending Acceptance</td>
                                     <td><i class="fa fa-trash delete-button"></i></td>
                                 `;
-
+                    
                                 // Add event listener to the delete button in the new row
                                 var deleteButton = newRow.querySelector('.delete-button');
                                 deleteButton.addEventListener('click', function () {
                                     deleteRow(newRow.rowIndex);
                                 });
-
+                    
                                 // Extract data from newRow and push it as an object to guarantors array
                                 const newRowData = {
                                     full_name: data.full_name,
-                                    member_number :data.member_number,
+                                    member_number: data.member_number,
                                     id_number: data.id_number,
                                     phone_number: data.phone_number,
+                                    is_self_guarantorship: data.is_self_guarantorship,
                                     status: "Pending Acceptance"
                                 };
-
+                    
                                 loanFormData.guarantors.push(newRowData);
-
+                    
                                 // Update the guarantors table based on the current guarantors array
                                 updateGuarantorsTable();
-
+                    
                                 // Update local storage and loan form data
                                 updateLoanFormData();
-
+                    
                                 Swal.fire({
                                     title: "Member Number found!",
                                     text: "A request has been sent to the guarantor, and it is pending their acceptance.",
                                     icon: "success"
                                 });
+                                
                             } else {
                                 document.getElementById('guarantorMemberNumber').value = '';
                                 Swal.fire({
@@ -1123,13 +1269,14 @@ document.addEventListener('DOMContentLoaded', function () {
                                 });
                                 return;
                             }
+
                         } else {
                             document.getElementById('guarantorMemberNumber').value = '';
                             Swal.fire({
                                 icon: "error",
                                 title: "Oops...",
                                 text: "Member number not found!",
-                                footer: '<a href="#" id="errorExplanation">Why do I have this issue?</a>'
+                                footer: '<a href="#" id="errorExplanationMemberNotFound">Why do I have this issue?</a>'
                             }).then((result) => {
                                 // Handle the click event on the link
                                 if (result.isConfirmed) {
@@ -1140,9 +1287,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                     });
                                 }
                             });
-                            // event delegation to handle the click outside the Swal.fire callback
-                            document.body.addEventListener('click', function(e) {
-                                if (e.target && e.target.id === 'errorExplanation') {
+                            // Event delegation to handle the click outside the Swal.fire callback
+                            document.body.addEventListener('click', function (e) {
+                                if (e.target && e.target.id === 'errorExplanationMemberNotFound') {
                                     e.preventDefault();
                                     Swal.fire({
                                         title: 'Error Explanation',
@@ -1150,15 +1297,16 @@ document.addEventListener('DOMContentLoaded', function () {
                                         icon: 'info'
                                     });
                                 }
-                            });                            
+                            });
                         }
                     };
-
+                    
                     xhr.onerror = function () {
                         console.error('Network error');
                     };
-
+                    
                     xhr.send();
+                    
                 }
             }
 
@@ -1170,7 +1318,6 @@ document.addEventListener('DOMContentLoaded', function () {
     updateGuarantorsTable();
 
     // --------------Guarantor Details End ----------------
-
 
 
     // --------------Loan Declaration Start ----------------
@@ -1185,7 +1332,6 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('input[name="loan_agreement"]').checked = loanFormData.declaration;
 
     // --------------Loan Declaration End ----------------
-
 
 
     // ------------------  Loan Submission Start ------------------
@@ -1211,7 +1357,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // ------------------  Loan Submission End ------------------
-
 
 
     // initialize objects and steps
@@ -1284,17 +1429,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
             } else if (formStepsNum === 2 ) {
 
-                // Check if at least two guarantors are selected
-                if (loanFormData.guarantors.length < 2) {
+                // Check for guarantor requirements, considering self-guarantorship
+                if (
+                    loanFormData.guarantors.length < 2 &&
+                    !loanFormData.guarantors.some(
+                    (guarantor) => guarantor.is_self_guarantorship
+                    )
+                ) {
                     Swal.fire({
-                        title: 'Guarantors Information is Required',
-                        text: 'Please add at least two guarantors.',
-                        icon: 'warning',
-                        confirmButtonText: 'OK',
+                    title: 'Guarantors Information is Required',
+                    text: 'Please add at least two guarantors.',
+                    icon: 'warning',
+                    confirmButtonText: 'OK',
                     });
-                    return false; 
+                    return false;
                 }
-
+  
                 // Update guarantors to local storage
                 updateLoanFormData();
 
@@ -1331,7 +1481,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         })
     })
-
 
     function updateFormSteps() {
         const formSteps = document.querySelectorAll('.form-step');
@@ -1439,21 +1588,77 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Function to update loanDetails in real-time
     function updateLoanDetails() {
-        loanFormData.loanDetails = {
-            loan_amount: document.getElementById('amount').value.trim(),
-            loanType: {
-                advanceLoan: document.getElementById('advanceLoan').checked,
-                normalLoan: document.getElementById('normalLoan').checked
-            },
-            repayment_period: document.getElementById('repaymentPeriod').value.trim(),
-            monthly_installment: document.getElementById('monthlyInstallment').value.trim(),
-            loan_purpose: document.getElementById('loanPurpose').value.trim()
-        };
-
-        // Update local storage and loan form data
-        updateLoanFormData();
+        // Get the loan amount from the input field
+        const loanAmount = document.getElementById('amount').value.trim();
+    
+        // Get the "Save and Continue" button element
+        const saveButton = document.getElementById('dissableIfLoanAmountNotLegible');
+    
+        // Make a GET request to check if the loan amount exceeds the maximum allowable
+        fetch(`check_LoanAmountMax/${loanAmount}`)
+            .then(response => response.json())
+            .then(data => {
+                if ('error' in data) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oops...',
+                        text: data.error,
+                        footer: '<a href="#" id="explanationLink">Why do I see this?</a>'
+                    }).then((result) => {
+                        // Handle the click event on the link
+                        if (result.isConfirmed) {
+                            Swal.fire({
+                                title: 'Explanation',
+                                html: 'The maximum loan amount is four times the value of the shares saved. For instance, if a member has shares worth KES 10,000, they can borrow up to KES 40,000. It\'s important to note that this amount may vary based on other factors; however, it cannot exceed four times the shares saved.',
+                                icon: 'info'
+                            });
+                        }
+                    });
+                    // Event delegation to handle the click outside the Swal callback
+                    document.body.addEventListener('click', function(e) {
+                        if (e.target && e.target.id === 'explanationLink') {
+                            e.preventDefault();
+                            Swal.fire({
+                                title: 'Explanation',
+                                html: 'The maximum loan amount is four times the value of the shares saved. For instance, if a member has shares worth KES 10,000, they can borrow up to KES 40,000. It\'s important to note that this amount may vary based on other factors; however, it cannot exceed four times the shares saved.',
+                                icon: 'info'
+                            });
+                        }
+                    });
+                    
+                    // Disable the "Save and Continue" button and apply custom styles
+                    saveButton.disabled = true;
+                    saveButton.style.pointerEvents = "none";
+                    saveButton.style.opacity = "0.2";
+                    saveButton.style.color = "#ddd";
+                } else {
+                    // Update loanFormData only if the loan amount is within the allowable range
+                    loanFormData.loanDetails = {
+                        loan_amount: loanAmount,
+                        loanType: {
+                            advanceLoan: document.getElementById('advanceLoan').checked,
+                            normalLoan: document.getElementById('normalLoan').checked
+                        },
+                        repayment_period: document.getElementById('repaymentPeriod').value.trim(),
+                        monthly_installment: document.getElementById('monthlyInstallment').value.trim(),
+                        loan_purpose: document.getElementById('loanPurpose').value.trim()
+                    };
+    
+                    // Update local storage and loan form data
+                    updateLoanFormData();
+    
+                    // Enable the "Save and Continue" button and reset styles
+                    saveButton.disabled = false;
+                    saveButton.style.pointerEvents = "auto";
+                    saveButton.style.opacity = "1";
+                    saveButton.style.color = ""; 
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
     }
-
+    
     // Function to update guarantors table based on the current guarantors array
     function updateGuarantorsTable() {
         const tableBody = document.getElementById('loanGuarantorsList');
@@ -1464,51 +1669,65 @@ document.addEventListener('DOMContentLoaded', function () {
         // Populate table with current guarantors array
         loanFormData.guarantors.map((guarantor, index) => {
             const newRow = tableBody.insertRow();
-            const verificationStatus = guarantor.verified ? 'Verified' : 'Pending Acceptance';
 
-            newRow.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${guarantor.full_name}</td>
-                <td>${guarantor.member_number}</td>
-                <td>${guarantor.id_number}</td>
-                <td>${guarantor.phone_number}</td>
-                <td class="pending-acceptance">
-                <p>${verificationStatus}${guarantor.verified ? ' <i class="fa fa-check-square" aria-hidden="true"></i>' : ''}</p>
-                ${!guarantor.verified ? `<strong data-guarantor-id="${guarantor.id_number}" id="verificationButton" data-guarantor-status="guarantor-verification" class="guarantor-acceptance">Verify <i class="fa fa-check-square" aria-hidden="true"></i></strong>` : ''}
-                </td>
-                <td><i class="fa fa-trash delete-button"></i></td>
-            `;
+            if (guarantor.is_self_guarantorship) {
+                // If the guarantor is self-guarantor, set the verification status to "All set"
+                newRow.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${guarantor.full_name}</td>
+                    <td>${guarantor.member_number}</td>
+                    <td>${guarantor.id_number}</td>
+                    <td>${guarantor.phone_number}</td>
+                    <td style="color:darkgreen;font-weight:bold;">Self Guaranteed</td>
+                    <td><i class="fa fa-trash delete-button"></i></td>
+                `;
+            } else {
+                const verificationStatus = guarantor.verified ? 'Verified' : 'Pending Acceptance';
+                newRow.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${guarantor.full_name}</td>
+                    <td>${guarantor.member_number}</td>
+                    <td>${guarantor.id_number}</td>
+                    <td>${guarantor.phone_number}</td>
+                    <td class="pending-acceptance">
+                        <p>${verificationStatus}${guarantor.verified ? ' <i class="fa fa-check-square" aria-hidden="true"></i>' : ''}</p>
+                        ${!guarantor.verified ? `<strong data-guarantor-id="${guarantor.id_number}" id="verificationButton" data-guarantor-status="guarantor-verification" class="guarantor-acceptance">Verify <i class="fa fa-check-square" aria-hidden="true"></i></strong>` : ''}
+                    </td>
+                    <td><i class="fa fa-trash delete-button"></i></td>
+                `;
 
-            // Add event listener to the verification button in the new row
-            if (!guarantor.verified) {
-                var verificationButton = newRow.querySelector('#verificationButton');
-                verificationButton.addEventListener('click', function () {
+                // Add event listener to the verification button in the new row
+                if (!guarantor.verified) {
+                    var verificationButton = newRow.querySelector('#verificationButton');
+                    verificationButton.addEventListener('click', function () {
+                        
+                        // Retrieve the data attribute value
+                        const guarantorIdNumber = verificationButton.dataset.guarantorId;
 
-                    // Retrieve the data attribute value
-                    const guarantorIdNumber = verificationButton.dataset.guarantorId;
+                        // Make an AJAX request to generate the verification code
+                        fetch('generate_guarantorship_verification_code/', {
+                            method: 'POST',  
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCookie('csrftoken'),  
+                            },
+                            body: JSON.stringify({
+                                guarantorIdNumber: guarantorIdNumber,  
+                            }),
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                // Pass the generated verification code to the showVerificationInput function
+                                showVerificationInput(guarantor.email, newRow, index, data.verification_code);
+                            } else {
+                                console.error('Error generating verification code');
+                            }
+                        });
+                        
 
-                    // Make an AJAX request to generate the verification code
-                    fetch('generate_guarantorship_verification_code/', {
-                        method: 'POST',  
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCookie('csrftoken'),  
-                        },
-                        body: JSON.stringify({
-                            guarantorIdNumber: guarantorIdNumber,  
-                        }),
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            // Pass the generated verification code to the showVerificationInput function
-                            showVerificationInput(guarantor.email, newRow, index, data.verification_code);
-                        } else {
-                            console.error('Error generating verification code');
-                        }
                     });
-                    
-                });
+                }
             }
 
             // Add event listener to the delete button in the new row
@@ -1606,8 +1825,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-
-    // delete row index
+    // ////////**delete row index
     function deleteRow(rowIndex) {
         var table = document.getElementById("guarantersTable");
 
@@ -1776,57 +1994,287 @@ document.addEventListener('DOMContentLoaded', function () {
     }  
 
 
-
-// Function to fetch and display the latest verification codes
-function fetchAndDisplayVerificationCodes() {
-    // Add your logic to fetch the latest codes from the server
-    $.ajax({
-        url: 'fetch_verification_codes/',  // Replace with the correct URL
-        method: 'GET',
-        success: function (data) {
-            console.log(data);
-
-        },
-        error: function () {
-            console.error('Error fetching verification codes');
-        }
-    });
-}
-
-
-
-// // Set up a timer to periodically fetch and display verification codes
-// setInterval(fetchAndDisplayVerificationCodes, 1000); // Run every 1000 milliseconds (1 second)
-
-
-
-
-
-
-
-
-
-
-
-// Function to update the table with new data
-// function updateTable(data) {
-//     const tableBody = document.getElementById('verificationCodeTableBody');
-//     // Clear existing rows
-//     tableBody.innerHTML = '';
-
-//     // Iterate over the data and append new rows to the table
-//     data.forEach((code) => {
-//         const newRow = document.createElement('tr');
-//         newRow.innerHTML = `
-//             <td>${code.created_at}</td>
-//             <td>${code.code_purpose}</td>
-//             <td>${code.code}</td>
-//             <td>${code.description}</td>
-//         `;
-//         tableBody.appendChild(newRow);
-//     });
-// }
-
 });    
+
+
+
+// HANDLE ADVANCE LOAN REPAYMENT PROCESS
+document.addEventListener('DOMContentLoaded', function () {
+    // Select all elements with the class "loan_repay"
+    const repayNowButtons = document.querySelectorAll('.loan_repay');
+
+    // Click event listener to each "Repay Now" button
+    repayNowButtons.forEach(button => {
+        button.addEventListener('click', function (event) {
+            // Prevent default link behavior
+            event.preventDefault();
+
+            // Get the IDs and data attribute values
+            const loanId = this.dataset.loanId;
+            const borrowedAmount = parseFloat(document.getElementById(`borrowedAmount_${loanId}`).innerText);
+            const interestRate = 0.05;
+            const amountToBePaid = parseFloat(document.getElementById(`amountToRepay_${loanId}`).innerText);
+
+            // Function to prompt user for partial repayment amount
+            function promptForPartialRepayment() {
+                Swal.fire({
+                    title: `Enter Partial Repayment Amount`,
+                    input: 'number',
+                    inputAttributes: {
+                        step: '0.01',
+                        min: '0.01',
+                        max: borrowedAmount 
+                    },
+                    showCancelButton: true,
+                    confirmButtonText: 'Repay',
+                    cancelButtonText: 'Cancel',
+                    icon: 'question',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'swal-button-partial-repay',
+                        cancelButton: 'swal-button-cancel'
+                    }
+                }).then((partialResult) => {
+                    if (partialResult.isConfirmed) {
+                        const partialAmount = parseFloat(partialResult.value);
+                        if (partialAmount > 0 && partialAmount <= amountToBePaid) {
+                            Swal.fire({
+                                title: `Confirm Partial Repayment`,
+                                html: `Are you sure you want to partially repay advance loan <strong>${loanId}</strong> with amount <strong>${partialAmount}</strong>?<br>Outstanding Loan Principal: <strong>${borrowedAmount - (partialAmount  - (borrowedAmount * interestRate))}</strong><br>.Outstanding Loan Interest: <strong>${(borrowedAmount - (partialAmount  - (borrowedAmount * interestRate))) * 0.05}</strong><br>Outstanding Amount To Repay: <strong>${(borrowedAmount - (partialAmount  - (borrowedAmount * interestRate))) + ((borrowedAmount - (partialAmount  - (borrowedAmount * interestRate))) * 0.05)}</strong>`,
+                                icon: 'question',
+                                showCancelButton: true,
+                                confirmButtonText: 'Yes',
+                                cancelButtonText: 'No',
+                                buttonsStyling: false,
+                                customClass: {
+                                    confirmButton: 'swal-button-partial-repay',
+                                    cancelButton: 'swal-button-cancel'
+                                }
+                            }).then((confirmResult) => {
+                                if (confirmResult.isConfirmed) {
+
+                                    // Inside the success callback of Swal.fire for full repayment
+                                    fetch('advanceLoan_repayment/', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRFToken': getCookie('csrftoken'), 
+                                        },
+                                        body: JSON.stringify({
+                                            loan_id: loanId,
+                                            full_amount: partialAmount,
+                                        }),
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+
+                                        if (data.status === 'success') {
+
+                                            showOverlay();
+                                            Swal.fire({
+                                                title: 'Request Submitted',
+                                                text: 'A request to partially repay your advance loan has been successfully submitted and is in review.',
+                                                icon: 'success',
+                                                buttonsStyling: false,
+                                                customClass: {
+                                                    confirmButton: 'swal-button-partial-repay',
+                                                }
+                                            }).then(() => {
+                                                hideOverlay();
+                                                location.reload()
+                                            });
+
+                                        } else if (data.status === 'Loan not found') {
+
+                                            // Handle loan not found error
+                                            Swal.fire({
+                                                icon: 'error',
+                                                title: 'Loan Not Found',
+                                                text: 'The loan ID provided does not exist. Please check the loan ID and try again.'
+                                            });
+                                            return false;
+
+                                        } else {
+                                            // Handle fetch errors
+                                            Swal.fire({
+                                                icon: 'error',
+                                                title: 'Error',
+                                                text: 'An error occurred while processing your request. Please try again.'
+                                            });
+                                            return false;
+                                        }
+
+                                    })
+                                    .catch(error => {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Error',
+                                            text: 'An error occurred while processing your request. Please try again.'
+                                        });
+                                        return false;
+                                    });
+
+                                }
+                            });
+                        } else {
+                            // If the entered partial amount is not within the valid range, prompt again
+                            Swal.fire({
+                                title: 'Invalid Amount',
+                                text: `Please enter a valid partial repayment amount between 0.01 and ${borrowedAmount}.`,
+                                icon: 'error',
+                                buttonsStyling: false,
+                                customClass: {
+                                    confirmButton: 'swal-button-partial-repay',
+                                }
+                            }).then(() => {
+                                promptForPartialRepayment(); // Prompt again
+                            });
+                        }
+                    }
+                });
+            }
+
+            // Function to show overlay
+            function showOverlay() {
+                const overlay = document.createElement('div');
+                overlay.classList.add('overlay');
+                document.body.appendChild(overlay);
+            }
+
+            // Function to hide overlay
+            function hideOverlay() {
+                const overlay = document.querySelector('.overlay');
+                if (overlay) {
+                    document.body.removeChild(overlay);
+                }
+            }
+
+            // Show SweetAlert prompt for full or partial repayment
+            Swal.fire({
+                title: 'Repayment Options',
+                text: 'Do you want to fully repay or partially repay the loan?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Fully Repay',
+                cancelButtonText: 'Partially Repay',
+                buttonsStyling: false,
+                customClass: {
+                    confirmButton: 'swal-button-full-repay',
+                    cancelButton: 'swal-button-partial-repay'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Fully repay the loan
+                    Swal.fire({
+                        title: `Confirm Full Repayment`,
+                        html: `Are you sure you want to fully repay advance loan <strong>${loanId}</strong> with amount <strong>${amountToBePaid}</strong> ?`,
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: 'Yes',
+                        cancelButtonText: 'No',
+                        buttonsStyling: false,
+                        customClass: {
+                            confirmButton: 'swal-button-partial-repay',
+                            cancelButton: 'swal-button-cancel'
+                        }
+                    }).then((confirmResult) => {
+                        if (confirmResult.isConfirmed) {
+
+                            // Inside the success callback of Swal.fire for full repayment
+                            fetch('advanceLoan_repayment/', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': getCookie('csrftoken'), 
+                                },
+                                body: JSON.stringify({
+                                    loan_id: loanId,
+                                    full_amount: amountToBePaid,
+                                }),
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+
+                                if (data.status === 'success') {
+
+                                    showOverlay();
+                                    Swal.fire({
+                                        title: 'Request Submitted',
+                                        text: 'A request to fully repay your advance loan has been successfully submitted and is in review.',
+                                        icon: 'success',
+                                        buttonsStyling: false,
+                                        customClass: {
+                                            confirmButton: 'swal-button-partial-repay',
+                                        }
+                                    }).then(() => {
+                                        hideOverlay();
+                                        location.reload()
+                                    });
+
+                                } else if (data.status === 'Loan not found') {
+
+                                    // Handle loan not found error
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Loan Not Found',
+                                        text: 'The loan ID provided does not exist. Please check the loan ID and try again.'
+                                    });
+                                    return false;
+
+                                } else {
+                                    // Handle fetch errors
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Error',
+                                        text: 'An error occurred while processing your request. Please try again.'
+                                    });
+                                    return false;
+                                }
+
+                            })
+                            .catch(error => {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Error',
+                                    text: 'An error occurred while processing your request. Please try again.'
+                                });
+                                return false;
+                            });
+
+                        }
+                    });
+                } else if (result.dismiss === Swal.DismissReason.cancel) {
+                    // Partially repay the loan
+                    promptForPartialRepayment(); // Initial prompt for partial repayment
+                }
+            });
+        });
+    });
+
+    // custom csrf
+    function getCookie(name) {
+        const cookieName = name + "=";
+        const decodedCookies = decodeURIComponent(document.cookie);
+        const cookieArray = decodedCookies.split(';');
+
+        for (let i = 0; i < cookieArray.length; i++) {
+            let cookie = cookieArray[i].trim();
+            if (cookie.indexOf(cookieName) === 0) {
+                return cookie.substring(cookieName.length);
+            }
+        }
+        return null;
+    }  
+
+});
+
+
+    
+// WELFARE LOAN REPAYMENT
+document.addEventListener('DOMContentLoaded', function () {
+
+
+
+});
 
 

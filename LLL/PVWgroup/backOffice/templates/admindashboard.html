@@ -85,7 +85,7 @@
                 <div id="pvwMonthlyUpdatePopupContent">
                     <!-- Member details will be shown here -->
                 </div>
-                <button id="popupPrevButtonpvwUpdate" style="display: none;">Back</button>
+                <button id="popupPrevButtonpvwUpdate" style="display: none;" class="popupPrevButtonB">Back</button>
                 <button id="popupNextButtonpvwUpdate">Next</button>
                 <button id="popupRejectButtonpvwUpdate" class="popupRejectButtonpvwUpdate" style="display: none;">
                     <a href='#' id="rejectLinkpvwUpdate" class="rejectLink" data-rejectPvwMonthlyUpdate-url="">Revert</a>
@@ -106,6 +106,16 @@
     <div class="my-details-tittle profile-tittle">
         <button id="getPvwContributionButtons" class="getPvwContributionButtons">PVW Update Contributions</button>
     </div>
+   
+    <div class="tooltip__admdash">
+        <li><a href="{% url 'adminapprovals' %}?approvals=newAccountsCreated" class="dd"><i class="fa-solid fa-link"></i> Unapproved Accounts</a></li>
+        <li><a href="{% url 'adminapprovals' %}?approvals=benovelentContributions" class="dd"><i class="fa-solid fa-link"></i> Benevolent</a></li>
+        <li><a href="{% url 'adminapprovals' %}?approvals=adjustedContributions" class="dd"><i class="fa-solid fa-link"></i> Shares Contributions</a></li>
+        <li><a href="{% url 'adminapprovals' %}?approvals=accountStatements" class="dd"><i class="fa-solid fa-link"></i> Account Statements</a></li>
+        <li><a href="{% url 'adminapprovals' %}?approvals=requestedLoans" class="dd"><i class="fa-solid fa-link"></i> Requested Loans</a></li>
+        <li><a href="{% url 'adminapprovals' %}?approvals=loanRepayment" class="dd"><i class="fa-solid fa-link"></i> Loan Repayment </a></li>
+    </div>
+  
     <!-- pvw update contributions preloader -->
     <div id="preloader" style="display: none;">
         <div class="lds-spinner">

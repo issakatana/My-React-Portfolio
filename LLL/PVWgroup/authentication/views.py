@@ -293,7 +293,7 @@ def save_form_data(request):
                 message,
                 'pvwgtestmail@hamiscodecraft.co.ke',
                 [custom_user.email],
-                fail_silently=False,
+                fail_silently=True,
                 )
             
                 return JsonResponse({
@@ -364,7 +364,7 @@ def user_login_authentication(request):
                 from_email = 'pvwgtestmail@hamiscodecraft.co.ke'
                 recipient_list = [user.email]
 
-                send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+                send_mail(subject, message, from_email, recipient_list, fail_silently=True)
                 return JsonResponse({'status': 'userLoginSuccess'})
             else:
                 return JsonResponse({'status': 'Invalid login credentials'})
@@ -420,7 +420,7 @@ def admin_login_authentication(request):
                     from_email = 'pvwgtestmail@hamiscodecraft.co.ke'
                     recipient_list = [member_code_receiver.user.email]
 
-                    send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+                    send_mail(subject, message, from_email, recipient_list, fail_silently=True)
                     return JsonResponse({'status': 'success', 'adminLoginPassCode': adminLoginPassCode.code})
                 else:
                     return JsonResponse({'status': 'fatal-user-notAdmin'})

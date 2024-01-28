@@ -109,26 +109,30 @@ class AdjustedShareContributions(models.Model):
 
 class WelfareLoan(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='welfare_loans')
-    loan_id = models.CharField(max_length=15, unique=True)
+    loan_id = models.CharField(max_length=30, unique=True)
     date_requested = models.DateField()
-    borrowed_amount = models.DecimalField(max_digits=15, decimal_places=2)
+    static_loan_borrowed_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    borrowed_amount = models.DecimalField(max_digits=30, decimal_places=2)
     loan_purpose = models.CharField(max_length=255, null=True, blank=True)
-    interest_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.05) 
-    total_loan_interest = models.DecimalField(max_digits=15, decimal_places=4, default=0.05) 
-    installment = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    interest_rate = models.DecimalField(max_digits=30, decimal_places=4, default=0.05) 
+    total_loan_interest = models.DecimalField(max_digits=30, decimal_places=4, default=0.05) 
+    installment = models.DecimalField(max_digits=30, decimal_places=4, default=0)
     duration_months = models.IntegerField()
     is_disbursed = models.BooleanField(default=False)
     posting_date = models.DateField(null=True, blank=True)
     loan_maturity_date = models.DateField(null=True, blank=True)
-    loan_amount_to_be_paid = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    loan_amount_to_be_paid = models.DecimalField(max_digits=100, decimal_places=2, default=0)
+    userRepayableRequest = models.DecimalField(max_digits=100, decimal_places=2, null=True, blank=True, default=0)
     is_repaid = models.BooleanField(default=False)
     date_repaid = models.DateField(null=True, blank=True)
     status = models.CharField(
-        max_length=10,
+        max_length=30,
         choices=[
             ('pending', 'Pending'),
             ('approved', 'Approved'),
             ('rejected', 'Rejected'),
+            ('partialPaid', 'partialPaid'),
+            ('pendingPayment', 'pendingPayment'),
             ('cleared', 'Cleared'),
         ],
         default='pending'
@@ -209,12 +213,14 @@ class ReducingTable(models.Model):
     date_picked = models.DateField(null=True, blank=True)
     installment_maturity_date = models.DateField()
     status = models.CharField(
-        max_length=10,
+        max_length=30,
         choices=[
             ('paid', 'Paid'),
             ('notpaid', 'Not Paid'),
             ('granted', 'Granted'),
             ('rejected', 'Rejected'),
+            ('partialPaid', 'partialPaid'),
+            ('pendingPayment', 'pendingPayment'),
             ('cleared', 'Cleared'),
         ],
         default='notpaid'
@@ -236,24 +242,28 @@ class AdvanceLoan(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='advance_loans')
     loan_id = models.CharField(max_length=15, unique=True)
     date_requested = models.DateField()
+    static_loan_borrowed_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     borrowed_amount = models.DecimalField(max_digits=10, decimal_places=2)
     loan_purpose = models.CharField(max_length=255, null=True, blank=True)
     interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.05)  
-    interest = models.DecimalField(max_digits=10, decimal_places=4)
+    interest = models.DecimalField(max_digits=100, decimal_places=2)
     is_disbursed = models.BooleanField(default=False)
     status = models.CharField(
-        max_length=10,
+        max_length=30,
         choices=[
             ('pending', 'Pending'),
             ('approved', 'Approved'),
             ('rejected', 'Rejected'),
+            ('partialPaid', 'partialPaid'),
+            ('pendingPayment', 'pendingPayment'),
             ('cleared', 'Cleared'),
         ],
         default='pending'
     )
     posting_date = models.DateField(null=True, blank=True)
     maturity_date = models.DateField()
-    amount_to_be_paid = models.DecimalField(max_digits=10, decimal_places=2)
+    amount_to_be_paid = models.DecimalField(max_digits=100, decimal_places=2)
+    userRepayableRequest = models.DecimalField(max_digits=100, decimal_places=2, null=True, blank=True, default=0)
     is_repaid = models.BooleanField(default=False)
     date_repaid = models.DateField(null=True, blank=True)
 
@@ -273,6 +283,7 @@ class AdvanceLoan(models.Model):
         if not self.loan_id:
             unique_code = uuid.uuid4().hex[:8].upper()
             self.loan_id = f"Pvw-Ad-{unique_code}"
+
         self.interest = float(self.borrowed_amount) * float(self.interest_rate)
         self.calculate_amount_to_be_paid()
         last_day_of_month = timezone.datetime(self.date_requested.year, self.date_requested.month, 1) + timezone.timedelta(days=32)

@@ -8,6 +8,7 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from authentication.models import CustomUser, Member, PersonalDetails, ContactDetails, Nominee, NextOfKin
+from membersPortal.models import MemberReasons
 from backOffice.models import Transaction, AdjustedShareContributions, Benovelent, BenevolentClaim, AdvanceLoan, WelfareLoan, ReducingTable, Guarantor, Payroll, DeceasedInformation, WelfareStatistics
 from django.http import HttpResponse, HttpResponseForbidden, HttpResponseServerError, JsonResponse
 from django.db import transaction
@@ -29,6 +30,7 @@ def get_or_create_member(user):
     except Member.DoesNotExist:
         member = Member.objects.create(user=user)
         return member  
+
 
 @login_required
 @user_passes_test(is_superuser)
@@ -98,7 +100,93 @@ def admindashboard(request):
         return HttpResponseServerError(f"An error occurred: {str(e)}")
   
 
- 
+
+################# ADMIN APPROVALS PAGE VIEWS ###############
+def adminapprovals(request):
+    current_user = request.user
+    name = current_user.username
+    # Get the queryset of new accounts that are not approved yet
+    new_accounts = CustomUser.objects.filter(
+        Q(Q(is_approved=False) & ~Q(status='Rejected')) |
+        Q(status='Blocked')
+    )
+    members_data = Member.objects.all()
+    last_login_utc = request.user.last_login
+
+    # Get the queryset of shares contributions 
+    benovelent_contribution_schedules = Benovelent.objects.filter(is_approved=True)
+    # Get the queryset of shares contributions 
+    share_contribution_schedules = AdjustedShareContributions.objects.filter(is_approved=True)
+    adjusted_contributions = AdjustedShareContributions.objects.filter(is_approved=False)
+    # Fetch member transactions 
+    transactions = Transaction.objects.filter()
+
+    # Get advance loan unapproved requests 
+    advance_loan_unapproved_requests =  AdvanceLoan.objects.filter(is_disbursed=False, status='pending')
+
+    # Get welfare loan unapproved requests 
+    welfare_loan_unapproved_requests =  WelfareLoan.objects.filter(is_disbursed=False, status='pending')
+
+    # Get  benovelent claims unapproved requests 
+    benevolent_claims =  BenevolentClaim.objects.filter(is_approved=False, status='pending')
+
+    # Get running advance loan
+    advance_loan_runnings = AdvanceLoan.objects.filter(
+        is_disbursed=True,
+        is_repaid=False,
+        status__in=['approved', 'partialPaid', 'pendingPayment']
+    )
+    
+    for advance_loan_running in advance_loan_runnings:
+        # Advance loan reducing balance statistics
+        amountBorrowed = advance_loan_running.borrowed_amount
+        currentInterest = Decimal(str(advance_loan_running.borrowed_amount)) * Decimal('0.05')
+        paidLoanPrincipal = (advance_loan_running.userRepayableRequest - currentInterest)
+        outstandingLoanPrincipal = (amountBorrowed) - paidLoanPrincipal
+        outstandingLoanInterest = outstandingLoanPrincipal * Decimal('0.05')
+
+        # Calculate the difference between amount_to_be_paid and userRepayableRequest
+        advance_loan_running.difference = (
+            outstandingLoanPrincipal + outstandingLoanInterest
+        ).quantize(Decimal('0.0001'))
+
+    # Get welfare loan unapproved requests 
+    benovelent_contribution_schedules = Benovelent.objects.filter(is_approved=True)
+
+    if last_login_utc:
+        # Check if last_login_utc has timezone information
+        if last_login_utc.tzinfo is None or last_login_utc.tzinfo.utcoffset(last_login_utc) is None:
+            last_login_utc = timezone.make_aware(last_login_utc, timezone.utc)
+
+        # Convert UTC time to Nairobi time
+        nairobi_tz = pytz.timezone('Africa/Nairobi')
+        last_login_nairobi = last_login_utc.astimezone(nairobi_tz)
+    else:
+        last_login_nairobi = None
+    current_path = request.path
+    page_name = current_path.split('/')[-1]
+    page_title_map = {
+        'approvals': 'Approvals',
+    }
+    page_title = page_title_map.get(page_name, 'User Management')
+    
+    context = {
+        'page_title':  page_title,
+        'name':name,
+        'new_accounts': new_accounts,
+        'members_data': members_data,
+        'last_login': last_login_nairobi,
+        'adjusted_contributions': adjusted_contributions,
+        'share_contribution_schedules': share_contribution_schedules,
+        'benovelent_contribution_schedules' :benovelent_contribution_schedules,
+        'transactions':transactions,
+        'advance_loan_unapproved_requests': advance_loan_unapproved_requests,
+        'welfare_loan_unapproved_requests': welfare_loan_unapproved_requests,
+        'benevolent_claims': benevolent_claims,
+        'advance_loan_runnings' : advance_loan_runnings,
+    }
+
+    return render(request, 'approvals.html', context) 
 
 
 # --------------------- PVW UPDATE CONTRIBUTIONS MONTHLY START------------------------ #
@@ -117,8 +205,6 @@ def approve_pvwMonthlyUpdate_Contributions(request):
 
                 total_welfareLoan_interest = 0
                 total_welfareLoan_principal = 0 
-
-
 
                 # Exclude staff, superusers and filter only approved members
                 members_data = Member.objects.filter(
@@ -169,7 +255,7 @@ def approve_pvwMonthlyUpdate_Contributions(request):
                     advance_loans_due = AdvanceLoan.objects.filter(
                         member=member,
                         is_repaid=False,
-                        status="approved",
+                        status__in=['approved', 'partialPaid', 'pendingPayment'],
                         is_disbursed=True,
                         amount_to_be_paid__gt=0
                     )
@@ -243,7 +329,7 @@ def approve_pvwMonthlyUpdate_Contributions(request):
                     welfare_loan_instances = WelfareLoan.objects.filter(
                         member=member,
                         is_disbursed=True,
-                        status="approved",
+                        status__in=['approved', 'partialPaid', 'pendingPayment'],
                         is_repaid=False,
                         loan_amount_to_be_paid__gt=0
                     )   
@@ -404,7 +490,7 @@ def get_member_details_for_pvwUpdateContributions(request):
             advance_loans_due = AdvanceLoan.objects.filter(
                 member=member,
                 is_repaid=False,
-                status="approved",
+                status__in=['approved', 'partialPaid', 'pendingPayment'],
                 is_disbursed=True,
                 amount_to_be_paid__gt=0
             )
@@ -457,7 +543,7 @@ def get_member_details_for_pvwUpdateContributions(request):
             welfare_loan_instances = WelfareLoan.objects.filter(
                 member=member,
                 is_disbursed=True,
-                status="approved",
+                status__in=['approved', 'partialPaid', 'pendingPayment'],
                 is_repaid=False,
                 loan_amount_to_be_paid__gt=0
             )
@@ -544,9 +630,6 @@ def get_advance_loan_interest(loan_id):
 
 
 
-
-
-
 def get_welfare_loan_repayments(member):
     """Fetches welfare loan repayment details for a member."""
 
@@ -585,80 +668,6 @@ def get_welfare_loan_repayments(member):
 
 def pvwUpdateContributions(request):
     return redirect('admindashboard')
-
-
-# def approve_pvwMonthlyUpdate_Contributions(request):
-#     try:
-#         with transaction.atomic():
-#             # Exclude staff and superusers and filter only approved members
-#             members_data = Member.objects.filter(
-#                 user__is_staff=False,
-#                 user__is_superuser=False,
-#                 user__is_approved=True,
-#                 user__status='Approved'
-#             )
-
-#             total_share_amount = 0
-#             total_benevolent_amount = 0
-
-#             if request.method == 'POST':
-#                 if request.user.is_staff and request.user.status == "Approved":
-#                     for member in members_data:
-#                         # Update contributions for the member
-#                         member.update_benovelent_contribution(member.benovelent.benov_amount)
-#                         member.update_shares_contribution(member.share_amount.share_amount)
-#                         member.update_welfare()                           
-
-#                         # Create transaction records
-#                         Transaction.objects.create(
-#                             member=member,
-#                             activity_type='benovelent',
-#                             description="Benovelent Contribution Update",
-#                             debit=0,
-#                             credit=member.benovelent.benov_amount,
-#                         )
-
-#                         Transaction.objects.create(
-#                             member=member,
-#                             activity_type='shares',
-#                             description="Shares Contribution Update",
-#                             debit=0,
-#                             credit=member.share_amount.share_amount,
-#                         )
-
-#                         # Update total share and benevolent amounts
-#                         total_share_amount += member.share_amount.share_amount
-#                         total_benevolent_amount += member.benovelent.benov_amount
-
-#                     # Retrieve or create an instance of WelfareStatistics
-#                     welfare_statistics, created = WelfareStatistics.objects.get_or_create(pk=1)
-
-#                     # Update welfare_statistics balances
-#                     welfare_statistics.welfare_shares_balance += total_share_amount
-#                     welfare_statistics.welfare_benevolent_balance += total_benevolent_amount
-
-#                     # Call the update_welfare_balances method
-#                     welfare_statistics.update_welfare_balances(
-#                         welfare_statistics.welfare_shares_balance,
-#                         welfare_statistics.welfare_benevolent_balance
-#                     )
-
-#                     return JsonResponse({
-#                         'success': f'Successfully approved Welfare Loan.',
-#                         'total_share_amount': format(total_share_amount, ','),
-#                         'total_benevolent_amount': format(total_benevolent_amount, ','),
-#                         'new_total_share_amount_balance': format(welfare_statistics.welfare_shares_balance, ','),
-#                         'new_total_benevolent_amount_balance': format(welfare_statistics.welfare_benevolent_balance, ','),
-#                     })
-#                 else:
-#                     return JsonResponse({'error': 'Update not found or is already updated'}, status=400)
-#             else:
-#                 return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-#     except Member.DoesNotExist:
-#         return JsonResponse({'error': 'Member not found'}, status=404)
-#     except Exception as e:
-#         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
     
 
 def revert_pvwMonthlyUpdate_Contributions(request):
@@ -753,80 +762,9 @@ def adminprofile(request):
         return redirect('adminprofile')      
 
 
+##################### APPROVE NEW MEMBER,  UNBLOCK MEMBER START ###########################
 
-################# ADMIN APPROVALS PAGE VIEWS ###############
-def adminapprovals(request):
-    current_user = request.user
-    name = current_user.username
-    # Get the queryset of new accounts that are not approved yet
-    new_accounts = CustomUser.objects.filter(
-        Q(Q(is_approved=False) & ~Q(status='Rejected')) |
-        Q(status='Blocked')
-    )
-    members_data = Member.objects.all()
-    last_login_utc = request.user.last_login
-
-    # Get the queryset of shares contributions 
-    benovelent_contribution_schedules = Benovelent.objects.filter(is_approved=True)
-    # Get the queryset of shares contributions 
-    share_contribution_schedules = AdjustedShareContributions.objects.filter(is_approved=True)
-    adjusted_contributions = AdjustedShareContributions.objects.filter(is_approved=False)
-    # Fetch member transactions 
-    transactions = Transaction.objects.filter()
-
-    # Get advance loan unapproved requests 
-    advance_loan_unapproved_requests =  AdvanceLoan.objects.filter(is_disbursed=False, status='pending')
-
-    # Get welfare loan unapproved requests 
-    welfare_loan_unapproved_requests =  WelfareLoan.objects.filter(is_disbursed=False, status='pending')
-
-    # Get  benovelent claims unapproved requests 
-    benevolent_claims =  BenevolentClaim.objects.filter(is_approved=False, status='pending')
-
-    # Get running advance loan
-    advance_loan_runnings = AdvanceLoan.objects.filter(is_disbursed=True, is_repaid=False, status='approved')
-
-    # Get welfare loan unapproved requests 
-    benovelent_contribution_schedules = Benovelent.objects.filter(is_approved=True)
-
-    if last_login_utc:
-        # Check if last_login_utc has timezone information
-        if last_login_utc.tzinfo is None or last_login_utc.tzinfo.utcoffset(last_login_utc) is None:
-            last_login_utc = timezone.make_aware(last_login_utc, timezone.utc)
-
-        # Convert UTC time to Nairobi time
-        nairobi_tz = pytz.timezone('Africa/Nairobi')
-        last_login_nairobi = last_login_utc.astimezone(nairobi_tz)
-    else:
-        last_login_nairobi = None
-    current_path = request.path
-    page_name = current_path.split('/')[-1]
-    page_title_map = {
-        'approvals': 'Approvals',
-    }
-    page_title = page_title_map.get(page_name, 'User Management')
-    
-    context = {
-        'page_title':  page_title,
-        'name':name,
-        'new_accounts': new_accounts,
-        'members_data': members_data,
-        'last_login': last_login_nairobi,
-        'adjusted_contributions': adjusted_contributions,
-        'share_contribution_schedules': share_contribution_schedules,
-        'benovelent_contribution_schedules' :benovelent_contribution_schedules,
-        'transactions':transactions,
-        'advance_loan_unapproved_requests': advance_loan_unapproved_requests,
-        'welfare_loan_unapproved_requests': welfare_loan_unapproved_requests,
-        'benevolent_claims': benevolent_claims,
-        'advance_loan_runnings' : advance_loan_runnings,
-    }
-
-    return render(request, 'approvals.html', context)
-
-
-
-# GET USER DATA FOR APPROVAL AS MEMBERS
+#  GET USER DATA FOR APPROVAL AS MEMBERS
 def get_member_details(request, member_id):
     try:
         member = Member.objects.get(id=member_id)
@@ -844,134 +782,202 @@ def get_member_details(request, member_id):
             'sub_county': member.contact_details.subcounty or 'No data provided',
             'ward': member.contact_details.ward or 'No data provided',
             'sublocation': member.contact_details.sublocation or 'No data provided',
+
+            # applicants guarantor data
+            'nextofkins': [],
+
+            # applicants guarantor data
+            'dependants': [],
         }
-        if member.nominees.exists():
-            nominee = member.nominees.first()
-            member_details.update({
-                'nameofdependant': nominee.nameofdependant or 'No data provided',
-                'nominee_relationship': nominee.dependantrelationship or 'No data provided',
-                'nominee_idnumber': nominee.dependantidnumber or 'No data provided',
-                'nominee_contact': nominee.dependantcontact or 'No data provided',
+
+        for next_of_kin in member.next_of_kin.all():
+            member_details['nextofkins'].append({
+                'name': next_of_kin.nameofnextofkin or 'No data provided',
+                'relationship': next_of_kin.nextofkinrelationship or 'No data provided',
+                'idnumber': next_of_kin.nextofkinidnumber or 'No data provided',
+                'contact': next_of_kin.nextofkincontact or 'No data provided',
             })
-        else:
-            member_details.update({
-                'nameofdependant': 'No data provided',
-                'nominee_relationship': 'No data provided',
-                'nominee_idnumber': 'No data provided',
-                'nominee_contact': 'No data provided',
+
+        for nominee in member.nominees.all():
+            member_details['dependants'].append({
+                'name': nominee.nameofdependant or 'No data provided',
+                'relationship': nominee.dependantrelationship or 'No data provided',
+                'idnumber': nominee.dependantidnumber or 'No data provided',
+                'contact': nominee.dependantcontact or 'No data provided',
             })
-        if member.next_of_kin.exists():
-            next_of_kin = member.next_of_kin.first()
-            member_details.update({
-                'nextofkin_name': next_of_kin.nameofnextofkin or 'No data provided',
-                'nextofkin_relationship': next_of_kin.nextofkinrelationship or 'No data provided',
-                'nextofkin_idnumber': next_of_kin.nextofkinidnumber or 'No data provided',
-                'nextofkin_contact': next_of_kin.nextofkincontact or 'No data provided',
-            })
-        else:
-            member_details.update({
-                'nextofkin_name': 'No data provided',
-                'nextofkin_relationship': 'No data provided',
-                'nextofkin_idnumber': 'No data provided',
-                'nextofkin_contact': 'No data provided',
-            })
+
         return JsonResponse(member_details)
+
     except Member.DoesNotExist:
-        return JsonResponse({'error': 'Member not found'}, status=404)
+       return JsonResponse({'error': 'Member not found'}, status=404)
 
 
-
-# APPROVE USER AS PVW MEMBER
+# APPROVE USER AS PVW NEW MEMBER
 def approve_member(request, member_id):
-    try:
-        member = Member.objects.get(id=member_id)
-        user = member.user
+    if request.method == 'POST':
+        data = json.loads(request.body.decode('utf-8'))
+        accountUnblockingReason  = data.get('accountUnblockingReason', '')
 
-        full_name = member.personal_details.get_full_name()
-        member_number = member.user.member_number
+        try:
+            member = Member.objects.get(id=member_id)
+            user = member.user
 
-        # Check if the user is not already approved and the current user is a staff member
-        if request.user.is_staff and not user.is_approved:
-            # Create AdjustedShareContributions instance if not already created
-            adjusted_share_contributions, created = AdjustedShareContributions.objects.get_or_create(
-                member=member,
-                defaults={
-                    'share_amount': 150,
-                    'new_amount': 0,
-                    'request_date': timezone.now(),
-                    'is_approved': True,
-                    'status': 'pending',
-                    'posting_date': timezone.now()
-                }
-            )
-
-            # Create Benovelent instance if not already created
-            benovelent, created = Benovelent.objects.get_or_create(
-                member=member,
-                defaults={
-                    'benov_amount': 250,
-                    'is_approved': True,
-                    'status': 'approved',
-                    'posting_date': timezone.now()
-                }
-            )
-
-            # Approve new member
-            user.is_approved = True
-            user.status = 'Approved'
-            user.save()
-
-            # Update welfare_new_acccounts_reg in WelfareStatistics model
-            welfare_stats = WelfareStatistics.objects.first()  
-            welfare_stats.welfare_new_acccounts_reg += 3200
-            welfare_stats.save()
-
-            return JsonResponse({
-                'success': f'Successfully approved {full_name} as a member of Parkside Villa Welfare Group with Member Number {member_number}',
-                'full_name': full_name,
-                'member_number': member_number,
-            })
-        elif request.user.is_staff and user.is_approved: 
-            # Unblock existing member
-            user.status = 'Approved'
-            user.save()
-
-            return JsonResponse({
-                'success': f'Successfully unblocked {full_name} with Member Number {member_number}',
-                'full_name': full_name,
-                'member_number': member_number,
-            })
-        else:
-            return JsonResponse({'error': 'Member is already approved or unauthorized'}, status=400)
-    except Member.DoesNotExist:
-        return JsonResponse({'error': 'Member not found'}, status=404)
-
-
-# APPROVE USER AS PVW MEMBER
-def reject_accountCreated_request(request, member_id):
-    try:
-        member = Member.objects.get(id=member_id)
-        user = member.user
-
-        # Check if the user is not already approved and the current user is a staff member
-        if request.user.is_staff and not user.is_approved:
             full_name = member.personal_details.get_full_name()
             member_number = member.user.member_number
 
-            # Reject the user
-            user.is_approved = False
-            user.status = 'Rejected'
-            user.save()
+            # Check if the user is not already approved and the current user is a staff member
+            if request.user.is_staff and not user.is_approved:
+                # Create AdjustedShareContributions instance if not already created
+                adjusted_share_contributions, created = AdjustedShareContributions.objects.get_or_create(
+                    member=member,
+                    defaults={
+                        'share_amount': 150,
+                        'new_amount': 0,
+                        'request_date': timezone.now(),
+                        'is_approved': True,
+                        'status': 'pending',
+                        'posting_date': timezone.now()
+                    }
+                )
 
-            return JsonResponse({
-                'success': f'Successfully approved {full_name} as a member of Parkside Villa Welfare Group with Member Number {member_number}',
-                'full_name': full_name,
-                'member_number': member_number,
-            })
-        else:
-            return JsonResponse({'error': 'Member is already approved or unauthorized'}, status=400)
-    except Member.DoesNotExist:
-        return JsonResponse({'error': 'Member not found'}, status=404)
+                # Create Benovelent instance if not already created
+                benovelent, created = Benovelent.objects.get_or_create(
+                    member=member,
+                    defaults={
+                        'benov_amount': 250,
+                        'is_approved': True,
+                        'status': 'approved',
+                        'posting_date': timezone.now()
+                    }
+                )
+
+                # Approve new member
+                user.is_approved = True
+                user.status = 'Approved'
+                user.save()
+
+                # Update welfare_new_acccounts_reg in WelfareStatistics model
+                welfare_stats = WelfareStatistics.objects.first()  
+                welfare_stats.welfare_new_acccounts_reg += 3200
+                welfare_stats.save()
+
+                return JsonResponse({
+                    'success': f'Successfully approved {full_name} as a member of Parkside Villa Welfare Group with Member Number {member_number}',
+                    'full_name': full_name,
+                    'member_number': member_number,
+                })
+            elif request.user.is_staff and user.is_approved: 
+                # Unblock existing member
+                user.status = 'Approved'
+                user.save()
+
+                if accountUnblockingReason:
+                    # Add rejection reason to MemberReasons
+                    rejection_reason = MemberReasons.objects.create(
+                        account_manager=request.user.member,  
+                        member=member,
+                        action='Unblocking Blocked Account',
+                        action_reason=accountUnblockingReason
+                    )
+                    rejection_reason.save()
+
+                return JsonResponse({
+                    'success': f'Successfully unblocked {full_name} with Member Number {member_number}',
+                    'full_name': full_name,
+                    'member_number': member_number,
+                })
+            else:
+                return JsonResponse({'error': 'Member is already approved or unauthorized'}, status=400)
+        except Member.DoesNotExist:
+            return JsonResponse({'error': 'Member not found'}, status=404)
+
+
+# REJECT USER AS PVW NEW MEMBER
+def reject_accountCreated_request(request, member_id):
+    if request.method == 'POST':
+        data = json.loads(request.body.decode('utf-8'))
+        accountCreatedRejectionReason  = data.get('accountCreatedRejectionReason', '')
+        
+        try:
+            member = Member.objects.get(id=member_id)
+            user = member.user
+
+            # Check if the user is not already approved and the current user is a staff member
+            if request.user.is_staff and not user.is_approved:
+                full_name = member.personal_details.get_full_name()
+                member_number = member.user.member_number
+
+                # Reject the user
+                user.is_approved = False
+                user.status = 'Rejected'
+                user.save()
+
+                # Add rejection reason to MemberReasons
+                rejection_reason = MemberReasons.objects.create(
+                    account_manager=request.user.member,  
+                    member=member,
+                    action='New Created Account Rejected',
+                    action_reason=accountCreatedRejectionReason
+                )
+                rejection_reason.save()
+
+                return JsonResponse({
+                    'success': f'Successfully approved {full_name} as a member of Parkside Villa Welfare Group with Member Number {member_number}',
+                    'full_name': full_name,
+                    'member_number': member_number,
+                })
+            else:
+                return JsonResponse({'error': 'Member is already approved or unauthorized'}, status=400)
+
+        except Member.DoesNotExist:
+            return JsonResponse({'error': 'Member not found'}, status=404)
+
+
+# BLOCK ACCOUNT
+def block_account_request(request):
+    if request.method == 'POST':
+        member_number = request.POST.get('membernumberba')
+        block_reason = request.POST.get('blockReason')
+        
+        # Retrieve the CustomUser instance based on the provided member number
+        try:
+            custom_user = CustomUser.objects.get(member_number=member_number)
+            
+        except CustomUser.DoesNotExist:
+            return JsonResponse({'error': f'User with member number {member_number} not found'}, status=404)
+
+        # Retrieve the associated Member instance
+        try:
+            member = Member.objects.get(user=custom_user)
+            
+        except Member.DoesNotExist:
+            return JsonResponse({'error': f'Member not found for user with member number {member_number}'}, status=404)
+
+        # Retrieve the existing CustomUser record for the member
+        custom_user_instance = CustomUser.objects.filter(member=member).first()
+
+        if custom_user_instance:
+            # Update the existing record
+            custom_user_instance.is_approved = True
+            custom_user_instance.status = 'Blocked'
+            custom_user_instance.save()
+
+            # Add rejection reason to MemberReasons
+            rejection_reason = MemberReasons.objects.create(
+                account_manager=member,  
+                member=member,
+                action='User Blocked Own Account',
+                action_reason=block_reason
+            )
+            rejection_reason.save()
+
+        return redirect('login')
+
+    return render(request, 'accounts.html')
+
+##################### APPROVE NEW MEMBER, BLOCK UNBLOCK MEMBER END ###########################
+
+
 
 
 
@@ -1035,38 +1041,51 @@ def get_advanceLoan_details(request, loan_id):
 
 # REJECT ADVANCE LOAN
 def reject_advanceLoan_request(request, loan_id):
-    try:
-        with transaction.atomic():
-            borrowed_loan = AdvanceLoan.objects.get(loan_id=loan_id)
+    if request.method == 'POST':
+        data = json.loads(request.body.decode('utf-8'))
+        loanRejectionReason = data.get('loanRejectionReason', '')
 
-            # Check if the user is not already approved and the current user is a staff member
-            if request.user.is_staff and borrowed_loan.status == "pending":
-                # Reject Loan
-                borrowed_loan.status = "rejected"
-                borrowed_loan.save()
+        try:
+            with transaction.atomic():
+                borrowed_loan = AdvanceLoan.objects.get(loan_id=loan_id)
 
-                # Create a transaction record for the loan rejection
-                Transaction.objects.create(
-                    member=borrowed_loan.member,
-                    activity_type='loan rejection',
-                    description=f'Advance Loan {borrowed_loan.loan_id} Rejected',
-                    debit=borrowed_loan.borrowed_amount,  
-                    credit=0,
-                )
+                # Check if the user is not already approved and the current user is a staff member
+                if request.user.is_staff and borrowed_loan.status == "pending":
+                    # Reject Loan
+                    borrowed_loan.status = "rejected"
+                    borrowed_loan.save()
 
-                return JsonResponse({
-                    'success': f'Successfully rejected with Member Number for Advance Loan.',
-                    'loan_id': borrowed_loan.loan_id,  
-                    'member_number': borrowed_loan.member.user.member_number,
-                    'full_name': borrowed_loan.member.personal_details.get_full_name(),
-                })
-            else:
-                return JsonResponse({'error': 'Loan Application not found or is already approved'}, status=400)
+                    # Add rejection reason to MemberReasons
+                    rejection_reason = MemberReasons.objects.create(
+                        account_manager=request.user.member,  
+                        member=borrowed_loan.member,
+                        action='Advance Loan Rejected',
+                        action_reason=loanRejectionReason
+                    )
+                    rejection_reason.save()
 
-    except AdvanceLoan.DoesNotExist:
-        return JsonResponse({'error': 'AdvanceLoan not found'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+                    # Create a transaction record for the loan rejection
+                    Transaction.objects.create(
+                        member=borrowed_loan.member,
+                        activity_type='loan rejection',
+                        description=f'Advance Loan {borrowed_loan.loan_id} Rejected',
+                        debit=borrowed_loan.borrowed_amount,  
+                        credit=0,
+                    )
+
+                    return JsonResponse({
+                        'success': f'Successfully rejected with Member Number for Advance Loan.',
+                        'loan_id': borrowed_loan.loan_id,  
+                        'member_number': borrowed_loan.member.user.member_number,
+                        'full_name': borrowed_loan.member.personal_details.get_full_name(),
+                    })
+                else:
+                    return JsonResponse({'error': 'Loan Application not found or is already approved'}, status=400)
+
+        except AdvanceLoan.DoesNotExist:
+            return JsonResponse({'error': 'AdvanceLoan not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
 
 # APPROVE ADVANCE LOAN AND DISBURSE TO BORROWER
@@ -1084,9 +1103,6 @@ def approve_advance_loan(request, loan_id):
                 borrowed_loan.posting_date = timezone.now()
                 borrowed_loan.approve_loan_disbursed()
                 borrowed_loan.save()
-
-                print(borrowed_loan.borrowed_amount)  
-                print(borrowed_loan.interest)
 
                 # Update Member's salary_advance_loan//ensure to check if member already have a loan
                 member = borrowed_loan.member
@@ -1117,6 +1133,95 @@ def approve_advance_loan(request, loan_id):
     except Exception as e:
         print(f'An error occurred: {str(e)}')  # Print the actual error message for debugging
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+# APPROVE ADVANCE LOAN REPAYMENT
+@login_required
+def approve_advanceLoan_repayment(request):
+    if request.method == 'POST':
+        data = json.loads(request.body.decode('utf-8'))
+        loan_id = data.get('loan_id')
+        repayment_amount = data.get('amountPaid')
+       
+        if request.user.is_staff:
+            try:
+                with transaction.atomic():
+                    advLoan = AdvanceLoan.objects.select_for_update().get(
+                        loan_id=loan_id,
+                        is_repaid=False,
+                        status__in=['partialPaid', 'pendingPayment'],
+                        is_disbursed=True,
+                        amount_to_be_paid__gt=0,
+                    )
+
+                    # Retrieve all guarantors associated with the advLoan and update their attributes
+                    guarantors = advLoan.get_guarantors()
+                    for guarantor in guarantors:
+                        guarantor.guaranteed_repaid = True
+                        guarantor.signature_status = "Cleared"
+                        guarantor.save()
+
+                    # Advance loan reducing balance statistics
+                    amountBorrowed = Decimal(str(advLoan.borrowed_amount))
+                    currentInterest = Decimal(str(advLoan.borrowed_amount)) * Decimal('0.05')
+                    paidLoanPrincipal = (Decimal(repayment_amount) - currentInterest)
+                    outstandingLoanPrincipal = (amountBorrowed) - Decimal(paidLoanPrincipal)
+                    outstandingLoanInterest = Decimal(outstandingLoanPrincipal) * Decimal('0.05')
+                  
+                    if outstandingLoanPrincipal == 0 and outstandingLoanInterest == 0 and advLoan.amount_to_be_paid == repayment_amount:
+                        advLoan.approve_loan_repaid()
+                        advLoan.status = "Cleared"
+                        advLoan.save()
+                    else:
+                        advLoan.borrowed_amount = outstandingLoanPrincipal 
+                        advLoan.interest = outstandingLoanInterest
+                        advLoan.status = 'approved'
+                        advLoan.save()
+
+                    # Update member's salary_advance_loan and salary_advance_loan_interest
+                    try:
+                        member = Member.objects.get(user=advLoan.member.user)
+                    except Member.DoesNotExist:
+                        return JsonResponse({'status': 'Member not found'})
+                    else:
+                        member.salary_advance_loan = outstandingLoanPrincipal
+                        member.salary_advance_loan_interest = outstandingLoanInterest
+                        member.save()
+
+                    # Retrieve or create an instance of WelfareStatistics and update changes
+                    welfare_statistics, created = WelfareStatistics.objects.get_or_create(pk=1)
+                    welfare_statistics.welfare_loanInterest_balance += currentInterest
+                    welfare_statistics.save()
+
+                    # Create transaction records for loan interest 
+                    Transaction.objects.create(
+                        member=advLoan.member,
+                        activity_type='loan_interest',
+                        description=f"Loan Interest Payment - {advLoan.loan_id}",
+                        debit=currentInterest,
+                        credit=0,
+                    )
+
+                    # Create transaction records for loan principal
+                    Transaction.objects.create(
+                        member=advLoan.member,
+                        activity_type='loan_principal',
+                        description=f"Loan Principal Payment - {advLoan.loan_id}",
+                        debit=paidLoanPrincipal,
+                        credit=0,
+                    )
+
+                    # Return response with guarantors' information
+                    response_data = {
+                        'status': 'success',
+                        'message': 'Full repayment request submitted',
+                    }
+
+                    return JsonResponse(response_data)
+            except AdvanceLoan.DoesNotExist:
+                return JsonResponse({'status': 'Loan not found'})
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
 
 
@@ -1201,43 +1306,56 @@ def get_welfareLoan_details(request, loan_id):
 
 # REJECT WELFARE LOAN
 def reject_welfareLoan_request(request, loan_id):
-    try:
-        with transaction.atomic():
-            borrowed_loan = WelfareLoan.objects.get(loan_id=loan_id)
+   if request.method == 'POST':
+        data = json.loads(request.body.decode('utf-8'))
+        loanRejectionReason = data.get('loanRejectionReason', '')
 
-            # Check if the user is not already approved and the current user is a staff member
-            if request.user.is_staff and borrowed_loan.status == "pending":
-                # Reject Loan
-                borrowed_loan.status = "rejected"
-                borrowed_loan.save()
+        try:
+            with transaction.atomic():
+                borrowed_loan = WelfareLoan.objects.get(loan_id=loan_id)
 
-                # Update status to "rejected" in the associated ReducingTable entries
-                reducing_tables = ReducingTable.objects.filter(welfare_loan=borrowed_loan)
-                reducing_tables.update(status='rejected')
-               
-                # Create a transaction record for the loan rejection
-                Transaction.objects.create(
-                    member=borrowed_loan.member,
-                    activity_type='loan rejection',
-                    description=f'Welfare Loan {borrowed_loan.loan_id} Rejected',
-                    debit=borrowed_loan.borrowed_amount,  
-                    credit=0,
-                )
+                # Check if the user is not already approved and the current user is a staff member
+                if request.user.is_staff and borrowed_loan.status == "pending":
+                    # Reject Loan
+                    borrowed_loan.status = "rejected"
+                    borrowed_loan.save()
 
-                return JsonResponse({
-                    'success': f'Successfully rejected with Member Number for Advance Loan.',
-                    'loan_id': borrowed_loan.loan_id,  
-                    'member_number': borrowed_loan.member.user.member_number,
-                    'full_name': borrowed_loan.member.personal_details.get_full_name(),
-                })
-            else:
-                return JsonResponse({'error': 'Loan Application not found or is already approved'}, status=400)
+                    # Update status to "rejected" in the associated ReducingTable entries
+                    reducing_tables = ReducingTable.objects.filter(welfare_loan=borrowed_loan)
+                    reducing_tables.update(status='rejected')
 
-    except WelfareLoan.DoesNotExist:
-        return JsonResponse({'error': 'WelfareLoan not found'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+                    # Add rejection reason to MemberReasons
+                    rejection_reason = MemberReasons.objects.create(
+                        account_manager=request.user.member,  
+                        member=borrowed_loan.member,
+                        action='Welfare Loan Rejected',
+                        action_reason=loanRejectionReason
+                    )
+                    rejection_reason.save()
+                
+                    # Create a transaction record for the loan rejection
+                    Transaction.objects.create(
+                        member=borrowed_loan.member,
+                        activity_type='loan rejection',
+                        description=f'Welfare Loan {borrowed_loan.loan_id} Rejected',
+                        debit=borrowed_loan.borrowed_amount,  
+                        credit=0,
+                    )
 
+                    return JsonResponse({
+                        'success': f'Successfully rejected with Member Number for Advance Loan.',
+                        'loan_id': borrowed_loan.loan_id,  
+                        'member_number': borrowed_loan.member.user.member_number,
+                        'full_name': borrowed_loan.member.personal_details.get_full_name(),
+                    })
+                
+                else:
+                    return JsonResponse({'error': 'Loan Application not found or is already approved'}, status=400)
+
+        except WelfareLoan.DoesNotExist:
+            return JsonResponse({'error': 'WelfareLoan not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
 
 # APPROVE WELFARE LOAN AND DISBURSE TO BORROWER
@@ -1287,11 +1405,6 @@ def approve_welfare_loan(request, loan_id):
         return JsonResponse({'error': 'WelfareLoan not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
-
-
-
-
-
 
 
 
@@ -1538,34 +1651,3 @@ def reject_benevolentClaim_request(request, id):
 
 
 
-def block_account_request(request):
-    if request.method == 'POST':
-        member_number = request.POST.get('membernumberba')
-        block_reason = request.POST.get('blockReason')
-        
-        # Retrieve the CustomUser instance based on the provided member number
-        try:
-            custom_user = CustomUser.objects.get(member_number=member_number)
-            
-        except CustomUser.DoesNotExist:
-            return JsonResponse({'error': f'User with member number {member_number} not found'}, status=404)
-
-        # Retrieve the associated Member instance
-        try:
-            member = Member.objects.get(user=custom_user)
-            
-        except Member.DoesNotExist:
-            return JsonResponse({'error': f'Member not found for user with member number {member_number}'}, status=404)
-
-        # Retrieve the existing CustomUser record for the member
-        custom_user_instance = CustomUser.objects.filter(member=member).first()
-
-        if custom_user_instance:
-            # Update the existing record
-            custom_user_instance.is_approved = True
-            custom_user_instance.status = 'Blocked'
-            custom_user_instance.save()
-
-        return redirect('login')
-
-    return render(request, 'accounts.html')

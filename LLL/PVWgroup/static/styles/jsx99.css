@@ -38,7 +38,9 @@ a {
     max-height: 200px; 
     overflow-y: auto;
 }
-
+.popupPrevButtonB {
+    background-color: #333 !important;
+}
 
 
 

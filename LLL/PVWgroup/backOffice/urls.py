@@ -19,7 +19,8 @@ urlpatterns = [
     path('get_advanceLoan_details/<str:loan_id>/', views.get_advanceLoan_details, name='get_advanceLoan_details'),
     path('reject_advanceLoan_request/<str:loan_id>/', views.reject_advanceLoan_request, name='reject_advanceLoan_request'),
     path('approve_advance_loan/<str:loan_id>/', views.approve_advance_loan, name='approve_advance_loan'),
-    
+    path('approve_advanceLoan_repayment/', views.approve_advanceLoan_repayment, name='approve_advanceLoan_repayment'),
+   
     # welfare loan
     path('get_welfareLoan_details/<str:loan_id>/', views.get_welfareLoan_details, name='get_welfareLoan_details'),
     path('reject_welfareLoan_request/<str:loan_id>/', views.reject_welfareLoan_request, name='reject_welfareLoan_request'),

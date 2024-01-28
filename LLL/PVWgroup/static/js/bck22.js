@@ -121,29 +121,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             </div> 
                         </div>
                     </div>
-                    <div class="next-of-kin-data next-of-kin pending-approval">
-                        <div class="my-member-tittle profile-tittle">
-                            <p>Next of Kin Data</p>
-                        </div>
-                        <table class="tbl">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Relationship</th>
-                                    <th>ID Number/Birth Certificate Number</th>
-                                    <th>Contact</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>${data.nextofkin_name}</td>
-                                    <td>${data.nextofkin_relationship}</td>
-                                    <td>${data.nextofkin_idnumber}</td>
-                                    <td>${data.nextofkin_contact}</td>
-                                </tr>
-                            </tbody>
-                        </table>    
-                    </div>
                     <div class="nominee-data member-nominees pending-approval">
                         <div class="my-member-tittle profile-tittle">
                             <p>Dependants Data</p>
@@ -158,12 +135,39 @@ document.addEventListener('DOMContentLoaded', function () {
                                 </tr>
                             </thead>
                             <tbody>
+                                ${data.dependants.map(dependent => `
+                                    <tr>
+                                        <td>${dependent.name || 'No data provided'}</td>
+                                        <td>${dependent.relationship || 'No data provided'}</td>
+                                        <td>${dependent.idnumber || 'No data provided'}</td>
+                                        <td>${dependent.contact || 'No data provided'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>                                       
+                    </div>
+                    <div class="next-of-kin-data next-of-kin pending-approval">
+                        <div class="my-member-tittle profile-tittle">
+                            <p>Next of Kin Data</p>
+                        </div>
+                        <table class="tbl">
+                            <thead>
                                 <tr>
-                                    <td>${data.nameofdependant}</td>
-                                    <td>${data.nominee_relationship}</td>
-                                    <td>${data.nominee_idnumber}</td>
-                                    <td>${data.nominee_contact}</td>
+                                    <th>Name</th>
+                                    <th>Relationship</th>
+                                    <th>ID Number/Birth Certificate Number</th>
+                                    <th>Contact</th>
                                 </tr>
+                            </thead>
+                            <tbody>
+                                ${data.nextofkins.map(row => `
+                                    <tr>
+                                        <td>${row.name || 'No data provided'}</td>
+                                        <td>${row.relationship || 'No data provided'}</td>
+                                        <td>${row.idnumber || 'No data provided'}</td>
+                                        <td>${row.contact || 'No data provided'}</td>
+                                    </tr>
+                                `).join('')}
                             </tbody>
                         </table>
                     </div>
@@ -180,31 +184,93 @@ document.addEventListener('DOMContentLoaded', function () {
                     rejectClonedLink.addEventListener("click", function (event) {
                         event.preventDefault();
                         const url = rejectClonedLink.getAttribute("data-rejectAccountCreatedLoan-url");
-                    
-                        fetch(`reject_accountCreated_request/${memberId}/`)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! Status: ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
+
+                        // Use SweetAlert to prompt for a rejection reason
+                        Swal.fire({
+                            title: 'Provide Rejection Reason',
+                            input: 'text',
+                            inputLabel: 'Reason for Rejection',
+                            inputPlaceholder: 'Enter reason here...',
+                            showCancelButton: true,
+                            confirmButtonColor: '#d33',
+                            cancelButtonColor: '#3085d6',
+                            confirmButtonText: 'Next'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                const accountCreatedRejectionReason = result.value;
+
+                                // Use SweetAlert for confirmation with the provided reason
                                 Swal.fire({
-                                    icon: "success",
-                                    title: "Member Account Rejected!",
-                                    html: `You have successfully rejected <strong>${data.full_name}</strong> to be member of Parkside Villa Welfare Group with Member Number <strong>${data.member_number}</strong>.`,
-                                }).then(() => {
-                                    location.reload();
-                                });                              
-                            })
-                            .catch(error => {
-                                console.error("Error:", error);
-                                Swal.fire({
-                                    icon: "error",
-                                    title: "Reject Failed!",
-                                    text: "There was an error rejecting the account. Please try again.",
+                                    title: 'Confirm Rejection',
+                                    text: `Are you sure you want to reject this account with the reason:\n"${accountCreatedRejectionReason}"?`,
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#d33',
+                                    cancelButtonColor: '#3085d6',
+                                    confirmButtonText: 'Yes, reject it!'
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        // Send rejection reason to the backend along with memberId
+                                        fetch(`reject_accountCreated_request/${memberId}/`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRFToken': getCookie('csrftoken'), 
+                                            },
+                                            body: JSON.stringify({
+                                                accountCreatedRejectionReason : accountCreatedRejectionReason ,
+                                            }),
+                                        })
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                throw new Error(`HTTP error! Status: ${response.status}`);
+                                            }
+                                            return response.json();
+                                        })
+                                        .then(data => {
+                                            Swal.fire({
+                                                icon: "success",
+                                                title: "Member Account Rejected!",
+                                                html: `You have successfully rejected <strong>${data.full_name}</strong> from becoming a member of Parkside Villa Welfare Group with Member Number <strong>${data.member_number}</strong>.`,
+                                            }).then(() => {
+                                                // Hide elements with the class 'popup'
+                                                document.querySelectorAll('.popup').forEach(function (element) {
+                                                    element.style.display = 'none';
+                                                });
+                                                // Reload the page after hiding elements
+                                                location.reload();
+                                            });
+                                        })
+                                        .catch(error => {
+                                            console.error("Error:", error);
+                                            Swal.fire({
+                                                icon: "error",
+                                                title: "Rejection Failed!",
+                                                text: "There was an error rejecting the account. Please try again.",
+                                            });
+                                        });
+                                    }
                                 });
-                            });
+                            }
+                        });
+
+                        // Function to get CSRF token from cookies (if using Django)
+                        function getCookie(name) {
+                            var cookieValue = null;
+                            if (document.cookie && document.cookie !== '') {
+                                var cookies = document.cookie.split(';');
+                                for (var i = 0; i < cookies.length; i++) {
+                                    var cookie = cookies[i].trim();
+                                    // Does this cookie string begin with the name we want?
+                                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                                        break;
+                                    }
+                                }
+                            }
+                            return cookieValue;
+                        }
+                    
                     });
 
                     clonedLink.setAttribute("data-url", `{% url "approve_member" member_id=1 %}`.replace("1", memberId));
@@ -213,19 +279,47 @@ document.addEventListener('DOMContentLoaded', function () {
                     clonedLink.addEventListener("click", function (event) {
                         event.preventDefault(); 
                         const url = clonedLink.getAttribute("data-url");
-                        
-                        fetch(`approve_member/${memberId}/`)  
-                            .then(response => response.json())
-                            .then(data => {
-                                Swal.fire({
-                                    icon: "success",
-                                    title: "Member Approved!",
-                                    html: `You have successfully approved <strong>${data.full_name}</strong> as a member of Parkside Villa Welfare Group with Member Number <strong>${data.member_number}</strong>.`,
-                                }).then(() => {
-                                    location.reload();
-                                });
-                            })
-                            .catch(error => console.error("Error:", error));
+
+                        // Use SweetAlert for confirmation
+                        Swal.fire({
+                            title: 'Confirm Approval',
+                            text: 'Are you sure you want to approve this member?',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#28a745',  
+                            cancelButtonColor: '#3085d6',
+                            confirmButtonText: 'Yes, approve it!'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Perform the approval action here
+                                // You can add your logic for approving the member
+                                fetch(`approve_member/${memberId}/`)
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        Swal.fire({
+                                            icon: "success",
+                                            title: "Member Approved!",
+                                            html: `You have successfully approved <strong>${data.full_name}</strong> as a member of Parkside Villa Welfare Group with Member Number <strong>${data.member_number}</strong>.`,
+                                            
+                                        }).then(() => {
+                                            document.querySelectorAll('.popup').forEach(function(element) {
+                                                // Set the display style to 'none' for each element
+                                                element.style.display = 'none';
+                                            });
+                                            location.reload();
+                                        });
+                                    })
+                                    .catch(error => {
+                                        console.error("Error:", error);
+                                        Swal.fire({
+                                            icon: "error",
+                                            title: "Approval Failed!",
+                                            text: "There was an error approving the member. Please try again.",
+                                        });
+                                    });
+                            }
+                        });
+        
                     });
                     currentSection = 0; 
                     sections = document.querySelectorAll('.pending-approval');
@@ -306,29 +400,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             </div> 
                         </div>
                     </div>
-                    <div class="next-of-kin-data next-of-kin pending-approval">
-                        <div class="my-member-tittle profile-tittle">
-                            <p>Next of Kin Data</p>
-                        </div>
-                        <table class="tbl">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Relationship</th>
-                                    <th>ID Number/Birth Certificate Number</th>
-                                    <th>Contact</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>${data.nextofkin_name}</td>
-                                    <td>${data.nextofkin_relationship}</td>
-                                    <td>${data.nextofkin_idnumber}</td>
-                                    <td>${data.nextofkin_contact}</td>
-                                </tr>
-                            </tbody>
-                        </table>    
-                    </div>
                     <div class="nominee-data member-nominees pending-approval">
                         <div class="my-member-tittle profile-tittle">
                             <p>Dependants Data</p>
@@ -343,12 +414,39 @@ document.addEventListener('DOMContentLoaded', function () {
                                 </tr>
                             </thead>
                             <tbody>
+                                ${data.dependants.map(dependent => `
+                                    <tr>
+                                        <td>${dependent.name || 'No data provided'}</td>
+                                        <td>${dependent.relationship || 'No data provided'}</td>
+                                        <td>${dependent.idnumber || 'No data provided'}</td>
+                                        <td>${dependent.contact || 'No data provided'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>                                       
+                    </div>
+                    <div class="next-of-kin-data next-of-kin pending-approval">
+                        <div class="my-member-tittle profile-tittle">
+                            <p>Next of Kin Data</p>
+                        </div>
+                        <table class="tbl">
+                            <thead>
                                 <tr>
-                                    <td>${data.nameofdependant}</td>
-                                    <td>${data.nominee_relationship}</td>
-                                    <td>${data.nominee_idnumber}</td>
-                                    <td>${data.nominee_contact}</td>
+                                    <th>Name</th>
+                                    <th>Relationship</th>
+                                    <th>ID Number/Birth Certificate Number</th>
+                                    <th>Contact</th>
                                 </tr>
+                            </thead>
+                            <tbody>
+                                ${data.nextofkins.map(row => `
+                                    <tr>
+                                        <td>${row.name || 'No data provided'}</td>
+                                        <td>${row.relationship || 'No data provided'}</td>
+                                        <td>${row.idnumber || 'No data provided'}</td>
+                                        <td>${row.contact || 'No data provided'}</td>
+                                    </tr>
+                                `).join('')}
                             </tbody>
                         </table>
                     </div>
@@ -364,18 +462,94 @@ document.addEventListener('DOMContentLoaded', function () {
                         event.preventDefault(); 
                         const url = clonedLink.getAttribute("data-url");
                         
-                        fetch(`approve_member/${memberId}/`)  
-                            .then(response => response.json())
-                            .then(data => {
+                        // Use SweetAlert to prompt for a rejection reason
+                        Swal.fire({
+                            title: 'Provide Reason For Unblocking Member',
+                            input: 'text',
+                            inputLabel: 'Reason for Unblocking',
+                            inputPlaceholder: 'Enter reason here...',
+                            showCancelButton: true,
+                            confirmButtonColor: '#d33',
+                            cancelButtonColor: '#3085d6',
+                            confirmButtonText: 'Next'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                const accountUnblockingReason = result.value;
+
+                                // Use SweetAlert for confirmation with the provided reason
                                 Swal.fire({
-                                    icon: "success",
-                                    title: "Member Unblocked!",
-                                    html: `You have successfully unblocked account for <strong>${data.full_name}</strong> with Member Number <strong>${data.member_number}</strong>.`,
-                                }).then(() => {
-                                    location.reload();
+                                    title: 'Confirm Unblocking',
+                                    text: `Are you sure you want to unblock this account with the reason:\n"${accountUnblockingReason}"?`,
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#d33',
+                                    cancelButtonColor: '#3085d6',
+                                    confirmButtonText: 'Yes, unblock it!'
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        // Perform the rejection action here
+                                        // You can add your logic for rejecting the account
+                                        // Send rejection reason to the backend along with memberId
+                                        fetch(`approve_member/${memberId}/`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRFToken': getCookie('csrftoken'), 
+                                            },
+                                            body: JSON.stringify({
+                                                accountUnblockingReason : accountUnblockingReason,
+                                            }),
+                                        })
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                throw new Error(`HTTP error! Status: ${response.status}`);
+                                            }
+                                            return response.json();
+                                        })
+                                        .then(data => {
+                                            Swal.fire({
+                                                icon: "success",
+                                                title: "Member Unblocked!",
+                                                html: `You have successfully unblocked account for <strong>${data.full_name}</strong> with Member Number <strong>${data.member_number}</strong>.`,
+                                            }).then(() => {
+                                                // Hide elements with the class 'popup'
+                                                document.querySelectorAll('.popup').forEach(function (element) {
+                                                    element.style.display = 'none';
+                                                });
+                                                // Reload the page after hiding elements
+                                                location.reload();
+                                            });
+                                        })
+                                        .catch(error => {
+                                            console.error("Error:", error);
+                                            Swal.fire({
+                                                icon: "error",
+                                                title: "Unblocking Failed!",
+                                                text: "There was an error rejecting the account. Please try again.",
+                                            });
+                                        });
+                                    }
                                 });
-                            })
-                            .catch(error => console.error("Error:", error));
+                            }
+                        });
+
+                        // Function to get CSRF token from cookies (if using Django)
+                        function getCookie(name) {
+                            var cookieValue = null;
+                            if (document.cookie && document.cookie !== '') {
+                                var cookies = document.cookie.split(';');
+                                for (var i = 0; i < cookies.length; i++) {
+                                    var cookie = cookies[i].trim();
+                                    // Does this cookie string begin with the name we want?
+                                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                                        break;
+                                    }
+                                }
+                            }
+                            return cookieValue;
+                        }
+
                     });
                     currentSection = 0; 
                     sections = document.querySelectorAll('.pending-approval');
@@ -625,47 +799,95 @@ document.addEventListener('DOMContentLoaded', function () {
                     rejectClonedLink.addEventListener("click", function (event) {
                         event.preventDefault();
                         const url = rejectClonedLink.getAttribute("data-rejectAdvanceLoan-url");
-                    
-                        // Use SweetAlert for confirmation
+
+                        // Use SweetAlert to prompt for a rejection reason
                         Swal.fire({
-                            title: 'Confirm Rejection',
-                            text: 'Are you sure you want to reject the advance loan?',
-                            icon: 'warning',
+                            title: 'Provide Rejection Reason',
+                            input: 'text',
+                            inputLabel: 'Please provide a reason for rejecting this loan:',
+                            inputPlaceholder: 'Enter reason here...',
                             showCancelButton: true,
-                            confirmButtonColor: '#d33',
-                            cancelButtonColor: '#3085d6',
-                            confirmButtonText: 'Yes, reject it!'
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Next'
                         }).then((result) => {
                             if (result.isConfirmed) {
-                                // Perform the rejection action here
-                                // You can add your logic for rejecting the advance loan
-                    
-                                fetch(`reject_advanceLoan_request/${advanceloanId}/`)
-                                    .then(response => {
-                                        if (!response.ok) {
-                                            throw new Error(`HTTP error! Status: ${response.status}`);
-                                        }
-                                        return response.json();
-                                    })
-                                    .then(data => {
-                                        Swal.fire({
-                                            icon: "success",
-                                            title: "Advance Loan Rejected!",
-                                            html: `You have successfully rejected the advance loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
-                                        }).then(() => {
-                                            location.reload();
+                                const loanRejectionReason = result.value;
+
+                                // Use SweetAlert for confirmation with the provided reason
+                                Swal.fire({
+                                    text: `Are you sure you want to reject the advance loan for reason:\n"${loanRejectionReason}"?`,
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#3085d6',
+                                    cancelButtonColor: '#d33',
+                                    confirmButtonText: 'Yes, reject loan!'
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        // Perform the rejection action here
+                                        // You can add your logic for rejecting the account
+                                    
+                                        // Send rejection reason to the backend along with memberId
+                                        fetch(`reject_advanceLoan_request/${advanceloanId}/`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRFToken': getCookie('csrftoken'), 
+                                            },
+                                            body: JSON.stringify({
+                                                loanRejectionReason : loanRejectionReason ,
+                                            }),
+                                        })
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                throw new Error(`HTTP error! Status: ${response.status}`);
+                                            }
+                                            return response.json();
+                                        })
+                                        .then(data => {
+                                            Swal.fire({
+                                                icon: "success",
+                                                title: "Advance Loan Rejected!",
+                                                html: `You have successfully rejected the advance loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
+                                            }).then(() => {
+                                                // Hide elements with the class 'popup'
+                                                document.querySelectorAll('.popup').forEach(function (element) {
+                                                    element.style.display = 'none';
+                                                });
+                                                // Reload the page after hiding elements
+                                                location.reload();
+                                            });
+                                        })
+                                        .catch(error => {
+                                            console.error("Error:", error);
+                                            Swal.fire({
+                                                icon: "error",
+                                                title: "Reject Failed!",
+                                                text: "There was an error rejecting the advance loan. Please try again.",
+                                            });
                                         });
-                                    })
-                                    .catch(error => {
-                                        console.error("Error:", error);
-                                        Swal.fire({
-                                            icon: "error",
-                                            title: "Reject Failed!",
-                                            text: "There was an error rejecting the advance loan. Please try again.",
-                                        });
-                                    });
+                                    }
+                                });
                             }
                         });
+
+                        // Function to get CSRF token from cookies (if using Django)
+                        function getCookie(name) {
+                            var cookieValue = null;
+                            if (document.cookie && document.cookie !== '') {
+                                var cookies = document.cookie.split(';');
+                                for (var i = 0; i < cookies.length; i++) {
+                                    var cookie = cookies[i].trim();
+                                    // Does this cookie string begin with the name we want?
+                                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                                        break;
+                                    }
+                                }
+                            }
+                            return cookieValue;
+                        }
+
                     });
                     
                     approveClonedLink.setAttribute("data-approveAdvanceLoan-url", `{% url "approve_advance_loan" loan_id=1 %}`.replace("1", advanceloanId));
@@ -703,6 +925,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                             title: "Advance Loan Approved!",
                                             html: `You have successfully approved the advance loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
                                         }).then(() => {
+                                            // Hide elements with the class 'popup'
+                                            document.querySelectorAll('.popup').forEach(function (element) {
+                                                element.style.display = 'none';
+                                            });
+                                            // Reload the page after hiding elements
                                             location.reload();
                                         });
                                     })
@@ -716,6 +943,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                     });
                             }
                         });
+
                     });
                                         
                     currentSectionadv = 0; 
@@ -738,6 +966,167 @@ document.addEventListener('DOMContentLoaded', function () {
             showNextSection();
         });
 });
+
+
+
+// ADVANCE LOAN REPAYMENT APPROVALS
+document.addEventListener('DOMContentLoaded', function () {
+    // Select all elements with the class "loan_repay"
+    const repayNowButtons = document.querySelectorAll('.loan_repay');
+
+    // Add click event listener to each "Repay Now" button
+    repayNowButtons.forEach(button => {
+        button.addEventListener('click', function (event) {
+            // Prevent default link behavior
+            event.preventDefault();
+
+            // Get the ID and data attribute value
+            const loanId = this.dataset.loanId;
+            const borrowedAmount = parseFloat(document.getElementById(`borrowedAmount_${loanId}`).innerText);
+            const amountPaid = parseFloat(document.getElementById(`amountPaid_${loanId}`).innerText);
+
+            // Format amounts with commas and currency symbol
+            const formatAmount = (amount) => {
+                return 'KSh ' + amount.toLocaleString('en-US');
+            };
+
+            // Advance loan reducing balance statistics
+            const currentInterest = borrowedAmount * 0.05
+            const paidLoanPrincipal = (amountPaid - currentInterest)
+            const outstandingLoanPrincipal = (borrowedAmount) - paidLoanPrincipal
+            const outstandingLoanInterest = outstandingLoanPrincipal * 0.05
+            const outstandingBalance = outstandingLoanPrincipal + outstandingLoanInterest
+
+            // Prepare the HTML string based on conditions
+            let htmlString = `By clicking yes, you confirm that the member has paid <strong>${formatAmount(amountPaid)}</strong>`;
+
+            // Check if both outstandingLoanPrincipal and outstandingLoanInterest are not equal to 0
+            if (outstandingLoanPrincipal !== 0 || outstandingLoanInterest !== 0) {
+                htmlString += ` inclusive of loan interest of <strong>${formatAmount(currentInterest)}</strong>.<br><br>`;
+            } else {
+                htmlString += ` inclusive of loan amount borrowed of <strong>${formatAmount(borrowedAmount)}</strong> and loan interest of <strong>${formatAmount(currentInterest)}</strong>.<br><br>`;
+            }
+
+            // Add the remaining details to the HTML string
+            htmlString += `Outstanding Loan Principal: <strong>${formatAmount(outstandingLoanPrincipal)}</strong><br>Outstanding Loan Interest: <strong>${formatAmount(outstandingLoanInterest)}</strong><br>Outstanding Loan Balance: <strong>${formatAmount(outstandingBalance)}</strong>`;
+
+            // Show SweetAlert prompt for full or partial repayment
+            Swal.fire({
+                title: `Confirm Loan Repayment`,
+                html: htmlString,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes',
+                cancelButtonText: 'No',
+                buttonsStyling: false,
+                customClass: {
+                    confirmButton: 'swal-button-partial-repay',
+                    cancelButton: 'swal-button-cancel'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    
+                    // Inside the success callback of Swal.fire for full repayment
+                    fetch('approve_advanceLoan_repayment/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken'), 
+                        },
+                        body: JSON.stringify({
+                            loan_id: loanId,
+                            amountPaid: amountPaid,
+                        }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+
+                        if (data.status === 'success') {
+
+                            Swal.fire({
+                                title: 'Payment Approved',
+                                text: 'You have successfully approved the payment',
+                                icon: 'success',
+                                buttonsStyling: false,
+                                customClass: {
+                                    confirmButton: 'swal-button-partial-repay',
+                                }
+                            }).then(() => {
+                                location.reload()
+                            });
+
+                        } else if (data.status === 'Loan not found') {
+
+                            // Handle loan not found error
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Loan Not Found',
+                                text: 'The loan ID provided does not exist. Please check the loan ID and try again.'
+                            });
+                            return false;
+
+                        } else if (data.status === 'Member not found') {
+
+                            // Handle Member not found error
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Member not found',
+                                text: 'The Member not found or does not exist. Please consult Member ID and try again.'
+                            });
+                            return false;
+
+                        }  else {
+                            // Handle fetch errors
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: 'An error occurred while processing your request. Please try again.'
+                            });
+                            return false;
+                        }
+
+                    })
+                    .catch(error => {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'An error occurred while processing your request. Please try again.'
+                        });
+                        return false;
+                    });
+
+                } else {
+                    // Handle cancellation if needed
+                    Swal.fire({
+                        title: 'Repayment Cancelled',
+                        text: 'Your decision to cancel the repayment has been noted.',
+                        icon: 'info'
+                    });
+                }
+            });
+
+        });
+    });
+
+    // custom csrf
+    function getCookie(name) {
+        const cookieName = name + "=";
+        const decodedCookies = decodeURIComponent(document.cookie);
+        const cookieArray = decodedCookies.split(';');
+
+        for (let i = 0; i < cookieArray.length; i++) {
+            let cookie = cookieArray[i].trim();
+            if (cookie.indexOf(cookieName) === 0) {
+                return cookie.substring(cookieName.length);
+            }
+        }
+        return null;
+    }
+
+});
+
+
+
 
 
 
@@ -997,46 +1386,95 @@ document.addEventListener('DOMContentLoaded', function () {
                         event.preventDefault();
                         const url = rejectClonedLink.getAttribute("data-rejectWelfareLoan-url");
                     
-                        // Use SweetAlert for confirmation
+                        // Use SweetAlert to prompt for a rejection reason
                         Swal.fire({
-                            title: 'Confirm Rejection',
-                            text: 'Are you sure you want to reject the welfare loan?',
-                            icon: 'warning',
+                            title: 'Provide Rejection Reason',
+                            input: 'text',
+                            inputLabel: 'Please provide a reason for rejecting this loan:',
+                            inputPlaceholder: 'Enter reason here...',
                             showCancelButton: true,
-                            confirmButtonColor: '#d33',
-                            cancelButtonColor: '#3085d6',
-                            confirmButtonText: 'Yes, reject it!'
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Next'
                         }).then((result) => {
                             if (result.isConfirmed) {
-                                // Perform the rejection action here
-                                // You can add your logic for rejecting the welfare loan
-                    
-                                fetch(`reject_welfareLoan_request/${welfareloanId}/`)
-                                    .then(response => {
-                                        if (!response.ok) {
-                                            throw new Error(`HTTP error! Status: ${response.status}`);
-                                        }
-                                        return response.json();
-                                    })
-                                    .then(data => {
-                                        Swal.fire({
-                                            icon: "success",
-                                            title: "Welfare Loan Rejected!",
-                                            html: `You have successfully rejected the welfare loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
-                                        }).then(() => {
-                                            location.reload();
+                                const loanRejectionReason = result.value;
+
+                                // Use SweetAlert for confirmation with the provided reason
+                                Swal.fire({
+                                    title: 'Confirm Rejection',
+                                    text: `Are you sure you want to reject the welfare loan for reason:\n"${loanRejectionReason}"?`,
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#d33',
+                                    cancelButtonColor: '#3085d6',
+                                    confirmButtonText: 'Yes, reject loan!'
+                                }).then((result) => {
+                                    if (result.isConfirmed) {
+                                        // Perform the rejection action here
+                                        // You can add your logic for rejecting the account
+                                    
+                                        // Send rejection reason to the backend along with memberId
+                                        fetch(`reject_welfareLoan_request/${welfareloanId}/`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRFToken': getCookie('csrftoken'), 
+                                            },
+                                            body: JSON.stringify({
+                                                loanRejectionReason : loanRejectionReason ,
+                                            }),
+                                        })
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                throw new Error(`HTTP error! Status: ${response.status}`);
+                                            }
+                                            return response.json();
+                                        })
+                                        .then(data => {
+                                            Swal.fire({
+                                                icon: "success",
+                                                title: "Welfare Loan Rejected!",
+                                                html: `You have successfully rejected the welfare loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
+                                            }).then(() => {
+                                                // Hide elements with the class 'popup'
+                                                document.querySelectorAll('.popup').forEach(function (element) {
+                                                    element.style.display = 'none';
+                                                });
+                                                // Reload the page after hiding elements
+                                                location.reload();
+                                            });
+                                        })
+                                        .catch(error => {
+                                            console.error("Error:", error);
+                                            Swal.fire({
+                                                icon: "error",
+                                                title: "Reject Failed!",
+                                                text: "There was an error rejecting the welfare loan. Please try again.",
+                                            });
                                         });
-                                    })
-                                    .catch(error => {
-                                        console.error("Error:", error);
-                                        Swal.fire({
-                                            icon: "error",
-                                            title: "Reject Failed!",
-                                            text: "There was an error rejecting the welfare loan. Please try again.",
-                                        });
-                                    });
+                                    }
+                                });
                             }
                         });
+
+                        // Function to get CSRF token from cookies (if using Django)
+                        function getCookie(name) {
+                            var cookieValue = null;
+                            if (document.cookie && document.cookie !== '') {
+                                var cookies = document.cookie.split(';');
+                                for (var i = 0; i < cookies.length; i++) {
+                                    var cookie = cookies[i].trim();
+                                    // Does this cookie string begin with the name we want?
+                                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                                        break;
+                                    }
+                                }
+                            }
+                            return cookieValue;
+                        }
+
                     });
                     
                     approveClonedLink.setAttribute("data-approveWelfareLoan-url", `{% url "approve_welfare_loan" loan_id=1 %}`.replace("1", welfareloanId));
@@ -1074,6 +1512,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                             title: "Welfare Loan Approved!",
                                             html: `You have successfully approved the welfare loan with ID <strong>${data.loan_id}</strong> for <strong>${data.full_name}</strong>, Member Number <strong>${data.member_number}</strong>.`,
                                         }).then(() => {
+                                            // Hide elements with the class 'popup'
+                                            document.querySelectorAll('.popup').forEach(function (element) {
+                                                element.style.display = 'none';
+                                            });
+                                            // Reload the page after hiding elements
                                             location.reload();
                                         });
                                     })
@@ -1112,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });        
 });
 
-
+  
 // BENEVOLENT CLAIMS REJECTION AND APPROVALS
 document.addEventListener('DOMContentLoaded', function () {
     const approveBenevolentClaimButtons = document.querySelectorAll('.approveBenevolentClaim');

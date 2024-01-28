@@ -22,61 +22,16 @@ from django.views.decorators.http import require_POST
 from django.db.models import Q
 import random
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 # from rest_framework.decorators import api_view
 # from rest_framework.response import Response
 # from rest_framework import status
 # from .serializers import MemberSerializer
 
-# @api_view(['GET'])
-# def get_member_gross_salary(request, member_id):
-#     try:
-#         member = Member.objects.get(id=member_id)
-#         serializer = MemberSerializer(member)
-#         return Response(serializer.data['gross_salary'], status=status.HTTP_200_OK)
-#     except Member.DoesNotExist:
-#         return Response("Member not found", status=status.HTTP_404_NOT_FOUND)
-    
-
-from django.views.decorators.http import require_GET
-
-@require_GET
-def check_AdvanceloanEligibility_withSalary(request, salary):
-    try:
-        # Assuming the request user is associated with the Member model
-        member = request.user.member
-        print(member)
-
-        # Convert gross_salary to float before performing multiplication
-        gross_salary_float = float(member.gross_salary)
-        print(gross_salary_float)
-
-        # Check if the loan_amount is 50% or less of the gross_salary
-        is_loan_eligible = float(salary) <= 0.5 * gross_salary_float
-    except Member.DoesNotExist:
-        # If the Member does not exist, set is_loan_eligible to False
-        is_loan_eligible = False
-
-    return JsonResponse({'isLoanEligible': is_loan_eligible})
 
 
-@require_GET
-def check_NormalloanEligibility_withSalary(request, salary):
-    try:
-        # Assuming the request user is associated with the Member model
-        member = request.user.member
-        print(member)
 
-        # Convert gross_salary to float before performing multiplication
-        share_contribution_float = float(member.shares_contribution)
-        print(share_contribution_float)
-
-        # Check if the loan_amount is 50% or less of the gross_salary
-        is_loan_eligible = float(salary) <= 4 * share_contribution_float
-    except Member.DoesNotExist:
-        # If the Member does not exist, set is_loan_eligible to False
-        is_loan_eligible = False
-
-    return JsonResponse({'isLoanEligible': is_loan_eligible})
+#################### --------------------- DASHBOARD PAGE VIEW START ----------------- ##################
 
 
 @login_required
@@ -141,7 +96,7 @@ def dashboard(request):
 
 
 
-################# PROFILE PAGE VIEWS ###############
+################# ---------------------PROFILE PAGE VIEWS --------------###############
 @login_required
 def profile(request):
     try:
@@ -182,8 +137,7 @@ def profile(request):
 
 
 
-
-
+###################------------------------ ACCOUNTS PAGE VIEW START -----------------------#################
 def accounts(request):
     try:    
         member_instance = Member.objects.get(user=request.user)
@@ -261,7 +215,10 @@ def accounts(request):
 
 
 
-################# LOAN PAGE AND PROCESSES VIEWS START #################
+
+################# ---------LOAN PAGE AND PROCESSES VIEWS START---------#################
+    
+
 @login_required
 def loans(request):
     try:
@@ -337,7 +294,7 @@ def loans(request):
             member=member_instance,
             is_repaid=False,
             amount_to_be_paid__gt=0,
-            status__in=['pending', 'approved']
+            status__in=['pending', 'approved', 'partialPaid', 'pendingPayment']
         )
 
         # Fetch Welfare Loans where is_repaid is False and amount_to_be_paid is greater than zero
@@ -345,7 +302,7 @@ def loans(request):
             member=member_instance,
             is_repaid=False,
             loan_amount_to_be_paid__gt=0,
-            status__in=['pending', 'approved']
+            status__in=['pending', 'approved', 'partialPaid', 'pendingPayment']
         )
 
         context = {
@@ -374,77 +331,28 @@ def loans(request):
         return HttpResponseServerError(f"An error occurred: {str(e)}")
 
 
+@require_GET
+def check_LoanAmountMax(request, loanAmount):
+    try:
+        # Assuming the request user is associated with the Member model
+        member = request.user.member
 
+        # Convert shares_saved to float before performing multiplication
+        shares_saved_float = float(member.shares_contribution)
 
-# from django.core.serializers import serialize
+        # Calculate the maximum loan amount based on shares saved
+        max_loan_amount = 4 * shares_saved_float
 
-# def fetch_verification_codes(request):
-#     try:
-#         # Fetch the latest verification codes for the receiver user where is_picked is False and is_expired is False
-#         verification_codes = MailSmsVerificationCode.objects.filter(
-#             is_picked=False,
-#             expired=False
-#         )
+        # Check if the requested loan amount exceeds the maximum
+        if float(loanAmount) > max_loan_amount:
+            return JsonResponse({'error': 'Requested loan amount exceeds maximum allowable. Please try entering a lower amount and try again.'})
 
-#         # Serialize the queryset to JSON
-#         codes_data = serialize('json', verification_codes)
+    except Member.DoesNotExist:
+        # If the Member does not exist, set is_loan_eligible to False
+        return JsonResponse({'error': 'Member does not exist or is not eligible for a loan.'})
 
-#         # Convert the serialized data to a list of dictionaries
-#         codes_data = json.loads(codes_data)
-
-#         # Iterate through the codes and add additional fields
-#         for code in codes_data:
-#             code_object = MailSmsVerificationCode.objects.get(id=code['pk'])
-#             code['receiver_username'] = code_object.receiver_member.user.username
-#             code['sender_full_name'] = code_object.sender_member.personal_details.get_full_name()
-
-#         print(codes_data)
-
-#         # Return the verification codes as JSON response
-#         return JsonResponse({'verification_codes': codes_data})
-
-#     except Exception as e:
-#         return JsonResponse({'error': f"An error occurred: {str(e)}"}, status=500)
-
-
-
-# @login_required
-# def get_guarantor_info(request, member_number):
-#     try:
-#         user = get_object_or_404(CustomUser, member_number=member_number)
-
-#         # Check if the member number submitted matches the logged-in user's member number
-#         if request.user.member.user.member_number == member_number:
-#             loan_amount = float(request.GET.get('loan_amount', 0))
-#             share_contribution = float(request.user.member.shares_contribution)
-#             print(loan_amount)
-#             print(share_contribution)
-
-#             if loan_amount > 0.9 * share_contribution:
-#                 raise ValueError("Your total share contribution must exceeds 90% of Loan amount for self guarantorship.")
-
-#         # Print member number and loan amount for debugging
-#         print(f"Member Number: {user.member_number}")
-#         print(f"Loan Amount: {loan_amount}")
-
-#         personal_details = PersonalDetails.objects.get(member__user=user)
-#         contact_details = ContactDetails.objects.get(member__user=user)
-
-#         response_data = {
-#             'member_number': user.member_number,
-#             'full_name': f"{personal_details.surname} {personal_details.fname} {personal_details.onames}",
-#             'id_number': personal_details.idnumber,
-#             'phone_number': contact_details.phoneno,
-#         }
-
-#         return JsonResponse(response_data)
-#     except CustomUser.DoesNotExist:
-#         return render(request, '404.html')
-#     except Exception as e:
-#         print(f"Error: {str(e)}")
-#         response_data = {'error': str(e)}
-#         return JsonResponse(response_data, status=500)
-
+    # If the loan amount is eligible, return an empty response (200 OK)
+    return JsonResponse({})
 
 
 # View to get guarantor info 
@@ -454,34 +362,36 @@ def get_guarantor_info(request, member_number):
         with transaction.atomic():
             user = get_object_or_404(CustomUser, member_number=member_number, is_approved=True, is_superuser=False, status="Approved")
 
-            # Check if member number submitted matches the logged-in user
-            if request.user.member.user.member_number == member_number:
-                loan_amount = float(request.GET.get('loan_amount', 0))
-                share_contribution = float(request.user.member.shares_contribution)
-                print(loan_amount)
-                print(share_contribution)
-                
-                # if loan_amount is not None:
-                #     try:
-                #         loan_amount = float(loan_amount)
-                #     except ValueError as e:
-                #         print(f"Error converting loan_amount: {str(e)}")
-                #         response_data = {'error': str(e)}
-                #         return JsonResponse(response_data, status=500)
-                #     share_contribution = float(request.user.member.shares_contribution)
+            # Calculate share contribution and loan amount
+            share_contribution = float(request.user.member.shares_contribution)
+            loan_amount = float(request.GET.get('loan_amount', 0))
 
-                #     if loan_amount <= 0.9 * share_contribution:
-                #         response_data = {'error': "Your share contribution must be at least 90% of the loan amount to qualify for self-guarantorship."}
-                #         return JsonResponse(response_data, status=400)
-                    
+            # Check for self-guarantorship
+            is_self_guarantorship = False
+            if request.user.member_number == member_number:
+                if loan_amount > share_contribution * 0.9:
+                    return JsonResponse({'status': 'not self guarantorship'})
+                else:
+                    is_self_guarantorship = True
+
+            # Check if the provided member number has guaranteed more than two loans
+            num_active_guarantees = Guarantor.objects.filter(
+                Q(member_number=member_number) & ~Q(guaranteed_repaid=True)
+            ).count()
+
+            if num_active_guarantees >= 2 and not is_self_guarantorship:
+                return JsonResponse({'status': 'maximum limit'})
+
             # Fetch personal, contact details and prepare response data
             personal_details = PersonalDetails.objects.get(member__user=user)
             contact_details = ContactDetails.objects.get(member__user=user)
+
             response_data = {
                 'member_number': user.member_number,
                 'full_name': f"{personal_details.surname} {personal_details.fname} {personal_details.onames}",
                 'id_number': personal_details.idnumber,
                 'phone_number': contact_details.phoneno,
+                'is_self_guarantorship': is_self_guarantorship
             }
             return JsonResponse(response_data)
         
@@ -493,62 +403,6 @@ def get_guarantor_info(request, member_number):
         response_data = {'error': str(e)}
         return JsonResponse(response_data, status=500)
 
-
-
-
-# from django.http import JsonResponse
-# from django.template.loader import render_to_string
-# from django.db import connection
-
-# def filter_schedules(request):
-#     if request.method == 'POST':
-#         member_filter = request.POST.get('member_filter')
-#         member_number = request.POST.get('member_number')
-#         start_date = request.POST.get('start_date')
-#         end_date = request.POST.get('end_date')
-
-#         # Build the raw SQL query based on form data
-#         raw_sql = """
-#             SELECT *
-#             FROM "backOffice_reducingtable"
-#             WHERE 1=1
-#         """
-
-#         params = []  # Placeholder for parameters
-
-#         if member_filter == 'member' and member_number:
-#             raw_sql += ' AND member_id IN (SELECT id FROM "backOffice_reducingtable" WHERE member_number = %s)'
-#             params.append(member_number)
-
-#         # Additional conditions based on your requirements can be added here
-
-#         if start_date and end_date:
-#             raw_sql += ' AND posting_date BETWEEN %s AND %s'
-#             params.extend([start_date, end_date])
-
-#         # Execute raw SQL query using .raw()
-#         queryset = ReducingTable.objects.raw(raw_sql, params)
-
-#         print(queryset)
-
-#         # Render the schedules partial template to HTML
-#         html_content = render_to_string('partial_approvals.html', {'welfare_loans': queryset})
-
-#         # Return JSON response with the HTML content
-#         return JsonResponse({'html_content': html_content})
-
-#     return render(request, 'approvals.html')
-
-
-from django.shortcuts import render
-from django.http import JsonResponse
-from django.template.loader import render_to_string
-
-
-# views.py
-from django.shortcuts import render
-from django.http import JsonResponse
-from django.template.loader import render_to_string
 
 
 def filter_schedules(request):
@@ -563,105 +417,9 @@ def filter_schedules(request):
     print(start_date)
     print(end_date)
    
-    
-    
 
     # Return the filtered data as JSON
     return JsonResponse({'html': render_to_string('partial_approvals.html', {})})
-
-
-# from django.template.loader import render_to_string
-# from django.db import connection
-
-# def filter_schedules(request):
-#     if request.method == 'POST':
-#         # Extract form data
-#         member_filter = request.POST.get('member_filter')
-#         member_number = request.POST.get('member_number')
-#         start_date = request.POST.get('start_date')
-#         end_date = request.POST.get('end_date')
-
-#         # Validate form data
-#         if member_filter == 'member':
-#             if not member_number and not start_date and not end_date:
-#                 # Handle no filter criteria selected
-#                 return JsonResponse({'error': 'Please select a filter criteria'})
-
-#             if not member_number:
-#                 # Handle invalid member number
-#                 return JsonResponse({'error': 'Member number is required for member filter'})
-
-#         if start_date and not end_date:
-#             # Handle missing end date
-#             return JsonResponse({'error': 'End date is required for date range filter'})
-
-#         if end_date and not start_date:
-#             # Handle missing start date
-#             return JsonResponse({'error': 'Start date is required for date range filter'})
-
-#         # Construct raw SQL query based on form data
-#         raw_sql = """
-#             SELECT *
-#             FROM "backOffice_WelfareLoan"
-#             WHERE 1=1
-#         """
-
-#         params = []
-
-#         if member_filter == 'member' and member_number:
-#             # Check if the member exists
-#             member_exists_sql = """
-#                 SELECT 1
-#                 FROM authentication_customuser
-#                 WHERE member_number = %s
-#             """
-#             member_exists_params = [member_number]
-
-#             with connection.cursor() as exists_cursor:
-#                 exists_cursor.execute(member_exists_sql, member_exists_params)
-#                 member_exists = exists_cursor.fetchone()
-
-#             if not member_exists:
-#                 # If member doesn't exist, return an error
-#                 return JsonResponse({'error': 'Member not found'})
-
-#             # Filter by member number
-#             raw_sql += """
-#                 AND member_id = (
-#                     SELECT id
-#                     FROM authentication_customuser
-#                     WHERE member_number = %s
-#                 )
-#             """
-#             params.append(member_number)
-
-#         if start_date and end_date:
-#             # Filter by date range (if provided)
-#             raw_sql += """
-#                 AND posting_date BETWEEN %s AND %s
-#             """
-#             params.extend([start_date, end_date])
-
-#         # Print debugging information
-#         print('Raw SQL:', raw_sql)
-#         print('Params:', params)
-
-#         # Execute raw SQL query
-#         with connection.cursor() as cursor:
-#             cursor.execute(raw_sql, params)
-#             queryset = cursor.fetchall()
-
-#         # Print fetched data for debugging
-#         print('Queryset Data:', list(queryset))
-
-#         # Render the schedules partial template to HTML
-#         html_content = render_to_string('partial_approvals.html', {'welfare_loans': queryset})
-
-#         # Return JSON response with the HTML content
-#         return JsonResponse({'html_content': html_content})
-
-#     return render(request, 'approvals.html')
-
 
 
 def generate_guarantorship_verification_code(request):
@@ -732,55 +490,11 @@ def verify_mail_sms_code(request):
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
 
-
-
-from django.http import JsonResponse
-from .models import MailSmsVerificationCode
-from django.utils import timezone
-
-# def fetch_verification_codes(request):
-#     # print("am hereeee")
-    
-#     # # Ensure the user is a Member instance
-#     # if hasattr(request.user, 'member'):
-#     #     receiver_member = request.user.member
-#     # else:
-#     #     return JsonResponse({'error': 'User is not a Member'}, status=400)
-
-#     # # Fetch the latest verification codes for the receiver user where is_picked is False and is_expired is False
-#     # verification_codes = MailSmsVerificationCode.objects.filter(receiver_member=receiver_member, is_picked=False, expired=False).order_by('-created_at')[:10]
-
-#     # # Print the count of fetched verification codes for debugging
-#     # print(f"Fetched Verification Codes: {verification_codes.count()}")
-
-#     # # Prepare data to be sent as JSON
-#     # data = [{
-#     #     'created_at': code.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-#     #     'code_purpose': code.code_purpose,
-#     #     'code': code.code,
-#     #     'description': code.description,
-#     #     'sender_member_id': code.sender_member.id,
-#     #     'sender_member_username': code.sender_member.user.username,
-#     #     'receiver_member_id': code.receiver_member.id,
-#     #     'receiver_member_username': code.receiver_member.user.username,
-#     # } for code in verification_codes]
-
-#     # print(data)
-
-#     return JsonResponse(data, safe=False)
-
-
-
-
-
-
 # Loan submission model
 def handle_loan_submission(request):
     if request.method == 'POST':
         try:
             loan_data = json.loads(request.body)
-
-            print(loan_data)
 
             # Extracting relevant data form loanFromData
             idnumber = loan_data['personalDetails']['id_number']
@@ -835,6 +549,7 @@ def handle_loan_submission(request):
                 # Create AdvanceLoan instance
                 advance_loan = AdvanceLoan(
                     member=member,
+                    static_loan_borrowed_amount=borrowed_amount,
                     borrowed_amount=borrowed_amount,
                     date_requested=timezone.now().date(),
                     loan_id='',
@@ -897,6 +612,7 @@ def handle_loan_submission(request):
                     member=member,
                     loan_id='',
                     date_requested=timezone.now().date(),
+                    static_loan_borrowed_amount=borrowed_amount,
                     borrowed_amount=borrowed_amount,
                     loan_purpose=loan_purpose,
                     interest_rate=interest_rate,
@@ -953,6 +669,98 @@ def handle_loan_submission(request):
             return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+
+# advance loan repayment
+@login_required
+def advanceLoan_repayment(request):
+    if request.method == 'POST':
+        data = json.loads(request.body.decode('utf-8'))
+        loan_id = data.get('loan_id')
+        repayment_amount = data.get('full_amount')
+
+        # Ensure that the loan belongs to the requesting user
+        try:
+            advLoan = request.user.member.advance_loans.get(
+                loan_id=loan_id,
+                is_repaid=False,
+                status__in=['partialPaid', 'approved'],
+                is_disbursed=True,
+                amount_to_be_paid__gt=0,
+            )
+
+        except AdvanceLoan.DoesNotExist:
+            return JsonResponse({'status': 'Loan not found'})
+        
+        # Update the status to "pendingPayment" for full repayment
+        if advLoan.amount_to_be_paid == repayment_amount:
+            advLoan.status = 'pendingPayment'
+            advLoan.userRepayableRequest = repayment_amount
+            advLoan.save()
+        else:
+            advLoan.status = 'partialPaid'
+            advLoan.userRepayableRequest = repayment_amount
+            advLoan.save() 
+
+        # Return response with guarantors' information
+        response_data = {
+            'status': 'success',
+            'message': 'Full repayment request submitted',
+        }
+        return JsonResponse(response_data)
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+
+# @login_required
+# def advanceLoan_fully_repayment(request):
+#     if request.method == 'POST':
+#         data = json.loads(request.body.decode('utf-8'))
+#         loan_id = data.get('loan_id')
+#         fully_repayment_amount = data.get('full_amount')
+
+#         # Ensure that the loan belongs to the requesting user
+#         try:
+#             advLoan = request.user.member.advance_loans.get(
+#                 loan_id=loan_id,
+#                 is_repaid=False,
+#                 status="approved",
+#                 is_disbursed=True,
+#                 amount_to_be_paid__gt=0
+#             )
+
+#         except AdvanceLoan.DoesNotExist:
+#             return JsonResponse({'status': 'Loan not found'})
+
+#         # Retrieve all guarantors associated with the advLoan
+#         guarantors = advLoan.get_guarantors()
+
+#         # Prepare guarantors' information
+#         guarantors_info = []
+#         for guarantor in guarantors:
+#             guarantor_info = {
+#                 'full_name': guarantor.full_name,
+#                 'member_number': guarantor.member_number,
+#                 'id_number': guarantor.id_number,
+#                 'phone_number': guarantor.phone_number,
+#                 'signature_status': guarantor.get_signature_status_display(),
+#                 'loan_type_guaranteed': guarantor.loan_type_guaranteed,
+#                 'guaranteed_repaid': guarantor.guaranteed_repaid
+#             }
+#             guarantors_info.append(guarantor_info)
+
+#         print(guarantors_info)    
+
+#         # Return response with guarantors' information
+#         response_data = {
+#             'status': 'success',
+#             'message': 'Full repayment request submitted',
+#         }
+#         return JsonResponse(response_data)
+
+#     return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+  
 
 
 

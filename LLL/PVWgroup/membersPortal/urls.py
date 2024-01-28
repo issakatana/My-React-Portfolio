@@ -24,8 +24,12 @@ urlpatterns = [
     path('handle_loan_submission', views.handle_loan_submission, name='handle_loan_submission'),
 
     
-    path('check_AdvanceloanEligibility_withSalary/<str:salary>/', views.check_AdvanceloanEligibility_withSalary, name='check_AdvanceloanEligibility_withSalary'),
-    path('check_NormalloanEligibility_withSalary/<str:salary>/', views.check_NormalloanEligibility_withSalary, name='check_NormalloanEligibility_withSalary'),
+    # path('check_AdvanceloanEligibility_withSalary/<str:salary>/', views.check_AdvanceloanEligibility_withSalary, name='check_AdvanceloanEligibility_withSalary'),
+    # path('check_NormalloanEligibility_withSalary/<str:salary>/', views.check_NormalloanEligibility_withSalary, name='check_NormalloanEligibility_withSalary'),
+
+    path('check_LoanAmountMax/<int:loanAmount>/', views.check_LoanAmountMax, name='check_LoanAmountMax'),
+    
+    path('advanceLoan_repayment/', views.advanceLoan_repayment, name='advanceLoan_repayment'),
      
    
     path('filter_schedules/', views.filter_schedules, name='filter_schedules'),
