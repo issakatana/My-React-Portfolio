@@ -1,3 +1,19 @@
+:root {
+  /* FC */
+  --fc1:#000000;
+  --fc2:#0B60B0;
+  --fc3:#40A2D8;
+  --fc4:#F0EDCF;
+  /* BG-C */
+  --body-bg-color: #212426;
+  /* FF */
+  --ff-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  sans-serif;
+  --ff-roboto: "Roboto Slab", serif;
+  --ff-raleway: "Raleway", sans-serif;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

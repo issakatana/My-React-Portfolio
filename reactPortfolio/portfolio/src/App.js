@@ -1,5 +1,6 @@
 import React from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css'
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/base/layout/Layout';
@@ -16,8 +17,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<Layout />}>
-          <Route path='/' element={<Home />} />
+        <Route path='/' element={<Layout />}>
+          <Route index element={<Home />} />
           <Route path='/about' element={<About />} />
           <Route path='/skills' element={<Skills />} />
           <Route path='/services' element={<Services />} />
