@@ -1,0 +1,15 @@
+.bgc-about-custom {
+    background-color: #000;
+}
+
+.fc3,
+.fc4 {
+    color: var(--fc3);
+    text-decoration: none;
+    text-shadow: 2px 2px 2px rgba(0, 0, 0, .2);
+    font-weight: 600;
+}
+
+.fc4 {
+    color: var(--fc4);
+}

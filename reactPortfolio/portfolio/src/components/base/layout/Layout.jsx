@@ -11,7 +11,7 @@ import Footer from '../footer/Footer';
 */
 export default function Layout() {
     return (
-        <div className="d-flex flex-column min-vh-100">
+        <div className="d-flex flex-column">
             <Header />
             <div className="flex-grow-1">
                 <Outlet />

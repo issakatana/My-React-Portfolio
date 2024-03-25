@@ -1,0 +1,31 @@
+.bg-home,
+.bg-issa {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+    position: relative;
+    color: var(--fc4);
+    text-shadow: 2px 2px 2px rgba(0, 0, 0, .2);
+}
+
+.bg-home {
+    background-image: url('../../../assets/bgimages/hamisbg1.jpg');
+    background-attachment: fixed;
+}
+
+.fc3,
+.fc4 {
+    color: var(--fc3);
+    text-decoration: none;
+    text-shadow: 2px 2px 2px rgba(0, 0, 0, .2);
+    font-weight: 600;
+}
+
+.fc4 {
+    color: var(--fc4);
+}
+
+.bgc-about-custom {
+    background-color: #000;
+}
